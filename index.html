@@ -50,9 +50,12 @@
 <body>
   <nav class="topnav">
     <div class="inner">
-      <a class="active" href="index.html">Kalkulačka</a>
-      <a href="renta.html">Renta</a>
-      <a href="kouzlo.html">Kouzlo složeného úročení</a>
+
+      <a class="active" href="index.html" id="nav-uroceni">Složené úročení</a>
+      <a href="renta.html" id="nav-renta">Finanční nezávislost</a>
+      <a href="kouzlo.html" id="nav-kouzlo">Kouzlo složeného úročení</a>
+	<a href="hypoinv.html" id="nav-hypo">Hypotéka vs. investice</a>
+
     </div>
   </nav>
 
@@ -68,7 +71,7 @@
         <div class="body">
           <form id="calcForm" autocomplete="off">
             <div class="field">
-              <label for="lump">Jednorázová investice (Kč)</label>
+              <label for="lump">Jednorázová úložka (Kč)</label>
               <div class="input"><span>💰</span>
                 <input id="lump" type="text" inputmode="decimal" enterkeyhint="done" placeholder="např. 100 000" value="100 000" spellcheck="false" />
               </div>
@@ -86,14 +89,14 @@
               </div>
             </div>
             <div class="field">
-              <label for="years">Doba investice (roky)</label>
+              <label for="years">Doba spoření (roky)</label>
               <div class="input"><span>⏳</span>
                 <input id="years" type="text" inputmode="numeric" enterkeyhint="done" step="0.5" placeholder="např. 20" value="20" spellcheck="false" />
               </div>
             </div>
             <div class="btns" style="display:flex; gap:8px; margin-top:8px">
               <button class="btn primary" type="submit">Přepočítat</button>
-              <button id="resetBtn" class="btn" type="button">Reset</button>
+              <button id="resetBtn" class="btn" type="button">Vyčistit</button>
             </div>
           </form>
         </div>
@@ -101,7 +104,7 @@
 
       <section class="card" aria-labelledby="chartHeading">
         <div class="head">
-          <h2 id="chartHeading">Vývoj hodnoty investice</h2>
+          <h2 id="chartHeading">Vývoj hodnoty spoření</h2>
           <div class="legend"><span class="dot principal" style="width:12px;height:12px;border-radius:3px;background:var(--principal)"></span> vklady
             <span class="dot interest" style="width:12px;height:12px;border-radius:3px;background:var(--interest)"></span> zhodnocení
           </div>
