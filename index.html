@@ -208,7 +208,20 @@
       reset: $('resetBtn'), form: $('calcForm')
     };
 
-    // --- UX vylepšení sazby ---
+    // --- Univerzální „klikni-a-přepiš“ pro inputy ---
+    function enableSelectAll(el){
+      el.addEventListener('focus', () => {
+        el.select();
+        el.dataset.selAll = '1';
+      });
+      // Zabrání, aby první mouseup výběr zrušil
+      el.addEventListener('mouseup', (e) => {
+        if (el.dataset.selAll) { e.preventDefault(); delete el.dataset.selAll; }
+      });
+    }
+    [els.lump, els.monthly, els.years].forEach(enableSelectAll);
+
+    // --- UX vylepšení sazby (select-all + speciální chování) ---
     function getRate(){ return parseNum(els.rate.value); }
     function setRate(v){
       const n = Number.isFinite(+v) ? +v : 0;
@@ -229,7 +242,7 @@
 
       const P0=parseNum(els.lump.value),
             PMT=parseNum(els.monthly.value),
-            rate=parseNum(els.rate.value),   // syrový vstup funguje i během psaní
+            rate=parseNum(els.rate.value),
             years=parseNum(els.years.value);
 
       const {fv,annualTotal,annualDeposits,months} = computeAnnual(P0,PMT,rate,years);
@@ -261,14 +274,7 @@
     });
 
     // speciální handlery pro sazbu
-    // focus: select-all, první klik neodstraní výběr
-    els.rate.addEventListener('focus', () => {
-      els.rate.select();
-      els.rate.dataset.selAll = '1';
-    });
-    els.rate.addEventListener('mouseup', (e) => {
-      if (els.rate.dataset.selAll) { e.preventDefault(); delete els.rate.dataset.selAll; }
-    });
+    enableSelectAll(els.rate); // i sazba se na klik celé vybere
 
     // během psaní: neformátovat, ale hned přepočítat
     els.rate.addEventListener('input', () => {
