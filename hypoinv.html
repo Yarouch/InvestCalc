@@ -1,0 +1,437 @@
+<!doctype html>
+<html lang="cs">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Hypoteční vs. investiční kalkulačka</title>
+  <style>
+    :root{
+      /* Tmavé téma (výchozí) */
+      --bg: linear-gradient(180deg, #080A0E 0%, #0B0C10 40%, #0E1014 100%);
+      --panel:#12141a; --muted:#9aa3b2; --text:#e6e9ef; --brand:#4f8cff; --accent:#79e6a1;
+      --principal:#4f6dff; --interest:#00cc66; --grid: rgba(255,255,255,.08);
+      --radius:14px; --ring:0 0 0 3px rgba(79,140,255,.25);
+      color-scheme: light dark;
+    }
+    @media (prefers-color-scheme: light){
+      :root{
+        --bg: linear-gradient(180deg,#fff 0%,#f6f8fb 60%,#eef3f9 100%);
+        --panel:#ffffff; --muted:#667085; --text:#0b0c10; --brand:#375dfb; --accent:#00b36b; --grid: rgba(0,0,0,.08);
+      }
+    }
+
+    *{box-sizing:border-box}
+    body{
+      margin:0; font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Arial; color:var(--text); background:var(--bg);
+      min-height:100svh; padding-bottom:env(safe-area-inset-bottom)
+    }
+
+    /* Horní navigace (sjednocená s ostatními) */
+    .topnav{
+      position:sticky; top:0; z-index:100; background:rgba(18,20,26,.8); border-bottom:1px solid rgba(255,255,255,.06);
+      padding-top:max(10px, env(safe-area-inset-top)); backdrop-filter:blur(6px)
+    }
+    .topnav .inner{max-width:1100px; margin:0 auto; padding:10px 20px; display:flex; gap:12px; align-items:center}
+    .topnav a{display:inline-block; padding:10px 12px; border-radius:12px; text-decoration:none; color:#fff; border:1px solid transparent; font-weight:600;}
+    .topnav a.active{ background:linear-gradient(135deg,var(--brand),#6aa8ff); color:#fff; box-shadow:0 8px 20px rgba(79,140,255,.35) }
+    @media (prefers-color-scheme: light){
+      .topnav{ background:rgba(255,255,255,.75); border-bottom:1px solid rgba(0,0,0,.06) }
+      .topnav a{ color:#0b0c10 }
+      .topnav a.active{ color:#fff }
+    }
+
+    .wrap{ max-width:1100px; margin:min(6vh,48px) auto; padding:20px;
+      padding-left:max(20px,env(safe-area-inset-left)); padding-right:max(20px,env(safe-area-inset-right));
+    }
+    header{margin-bottom:18px}
+    h1{font-size:clamp(22px, 3.5vw, 32px); line-height:1.2; margin:0 0 6px}
+    .lead{color:var(--muted); margin:0}
+
+    /* Dvousloupec jako index/renta */
+    .grid{ display:grid; grid-template-columns: 400px 1fr; gap:22px; align-items:start }
+    @media (max-width: 900px){ .grid{ grid-template-columns: 1fr } }
+
+    .card{
+      border:1px solid rgba(255,255,255,.08); border-radius:var(--radius);
+      background:linear-gradient(180deg,rgba(255,255,255,.02),rgba(255,255,255,0)); box-shadow:0 10px 30px rgba(0,0,0,.35)
+    }
+    .card .head{ padding:16px 16px 8px; border-bottom:1px solid rgba(255,255,255,.06) }
+    .card .body{ padding:16px }
+    @media (prefers-color-scheme: light){ .card .head{border-bottom-color:rgba(0,0,0,.06)} }
+
+    /* Form prvky (sjednocené) */
+    form{ display:grid; gap:12px }
+    .field label{ display:block; font-weight:700; margin:0 0 6px; color:var(--text) }
+    .input{
+      display:flex; align-items:center; gap:8px; padding:10px 12px; border-radius:12px;
+      border:1px solid rgba(255,255,255,.10); background:rgba(0,0,0,.12)
+    }
+    .input:focus-within{ box-shadow:var(--ring); border-color:rgba(79,140,255,.3) }
+    .input span{ opacity:.85; color:var(--text) }
+    input{
+      appearance:none; border:0; outline:0; background:transparent; width:100%; color:var(--text); font:inherit
+    }
+    input::placeholder{ color:rgba(255,255,255,.65) }
+    @media (prefers-color-scheme: light){ input::placeholder{ color:rgba(0,0,0,.55)} }
+    :where(a,button,input):focus-visible{ outline:none; box-shadow:var(--ring) }
+
+    .actions{ display:flex; gap:8px; flex-wrap:wrap; margin-top:4px }
+    .btn{ border-radius:12px; border:1px solid rgba(255,255,255,.12); background:rgba(255,255,255,.06); color:var(--text); font-weight:700; padding:10px 14px; cursor:pointer }
+    .btn.primary{ background:linear-gradient(135deg,var(--brand),#6aa8ff); border-color:transparent; color:#fff; box-shadow:0 8px 20px rgba(79,140,255,.35) }
+    .btn.ghost{ background:transparent }
+
+    /* KPI + grafy vpravo */
+    .kpis{ display:grid; grid-template-columns: repeat(3,1fr); gap:12px; margin-top:10px }
+    @media (max-width: 640px){ .kpis{ grid-template-columns:1fr } }
+    .kpi{ padding:12px; border-radius:12px; border:1px solid rgba(255,255,255,.08); background:linear-gradient(180deg,rgba(255,255,255,.02),rgba(255,255,255,0)); }
+    .kpi .title{ color:var(--muted); font-size:13px; font-weight:700; letter-spacing:.02em; text-transform:uppercase }
+    .kpi .value{ font-size:clamp(18px,3.5vw,26px); font-weight:900; color:var(--text); }
+
+    .chart{ padding:14px }
+    .chart-inner{ position:relative; width:100%; aspect-ratio: 16 / 9 }
+    canvas{ width:100%; height:100%; display:block; background:transparent }
+    .legend{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; color:var(--muted) }
+
+    footer.note{ color:var(--muted); font-size:14px; margin-top:8px }
+
+    /* Čísla bez koleček u number (kdyby někde zůstalo) */
+    input[type=number] { -moz-appearance: textfield; }
+    input[type=number]::-webkit-outer-spin-button,
+    input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  </style>
+</head>
+<body>
+  <nav class="topnav">
+    <div class="inner">
+      <a href="index.html" id="nav-uroceni">Složené úročení</a>
+      <a href="renta.html" id="nav-renta">Finanční nezávislost</a>
+      <a href="kouzlo.html" id="nav-kouzlo">Kouzlo složeného úročení</a>
+      <a class="active" href="HypoInvKalk_v2.html" id="nav-hypo">Hypotéka vs. investice</a>
+    </div>
+  </nav>
+
+  <div class="wrap">
+    <header>
+      <h1>Hypotéka vs. investice</h1>
+      <p class="lead">Porovnej vývoj <strong>zůstatku hypotéky</strong> a <strong>hodnoty investice</strong>. Úložka do investice se uplatňuje <strong>na konci měsíce</strong>.</p>
+    </header>
+
+    <div class="grid">
+      <!-- LEVÝ SLOUPEC – Vstupy -->
+      <section class="card" aria-labelledby="formHeading">
+        <div class="head"><h2 id="formHeading">Vstupy</h2></div>
+        <div class="body">
+          <form id="calcForm" autocomplete="off">
+            <h3 class="mini" style="margin:0 0 6px;color:var(--muted);text-transform:uppercase;letter-spacing:.02em">Hypotéka</h3>
+            <div class="field">
+              <label for="loan">Výše hypotéky (Kč)</label>
+              <div class="input"><span>🏦</span>
+                <input id="loan" type="text" inputmode="numeric" enterkeyhint="done" value="7 000 000" spellcheck="false" />
+              </div>
+            </div>
+            <div class="field">
+              <label for="loanRate">Úrok hypotéky (% p.a.)</label>
+              <div class="input"><span>📉</span>
+                <input id="loanRate" type="text" inputmode="decimal" enterkeyhint="done" value="5,49" spellcheck="false" />
+              </div>
+            </div>
+            <div class="field">
+              <label for="loanYears">Doba splácení (roky)</label>
+              <div class="input"><span>⏳</span>
+                <input id="loanYears" type="text" inputmode="numeric" enterkeyhint="done" value="30" spellcheck="false" />
+              </div>
+            </div>
+
+            <h3 class="mini" style="margin:10px 0 6px;color:var(--muted);text-transform:uppercase;letter-spacing:.02em">Investice</h3>
+            <div class="field">
+              <label for="lump">Jednorázová investice (Kč)</label>
+              <div class="input"><span>💰</span>
+                <input id="lump" type="text" inputmode="numeric" enterkeyhint="done" value="500 000" spellcheck="false" />
+              </div>
+            </div>
+            <div class="field">
+              <label for="monthly">Měsíční úložka (Kč)</label>
+              <div class="input"><span>📥</span>
+                <input id="monthly" type="text" inputmode="numeric" enterkeyhint="done" value="7 000" spellcheck="false" />
+              </div>
+            </div>
+            <div class="field">
+              <label for="invRate">Roční zhodnocení investice (% p.a.)</label>
+              <div class="input"><span>📈</span>
+                <input id="invRate" type="text" inputmode="decimal" enterkeyhint="done" value="9,00" spellcheck="false" />
+              </div>
+            </div>
+
+            <div class="actions">
+              <button class="btn primary" type="submit">Přepočítat</button>
+              <button class="btn" type="button" id="resetBtn">Reset</button>
+              <button class="btn ghost" type="button" id="shareBtn">Sdílet</button>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <!-- PRAVÝ SLOUPEC – Grafy + KPI -->
+      <section class="card" aria-labelledby="chartHeading">
+        <div class="head">
+          <h2 id="chartHeading">Vývoj v čase</h2>
+          <div class="legend">
+            <span style="width:12px;height:12px;border-radius:3px;background:var(--brand);display:inline-block"></span> Zůstatek hypotéky
+            <span style="width:12px;height:12px;border-radius:3px;background:var(--accent);display:inline-block"></span> Hodnota investice
+          </div>
+        </div>
+        <div class="body chart">
+          <div class="chart-inner" aria-label="Graf porovnání zůstatku hypotéky a hodnoty investice" aria-describedby="graphDesc">
+            <canvas id="combinedChart"></canvas>
+          </div>
+          <p id="graphDesc" style="position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden">
+            Modrá křivka zobrazuje zůstatek hypotéky, zelená křivka hodnotu investice.
+          </p>
+
+          <div class="kpis" id="kpis" aria-live="polite" aria-atomic="true">
+            <div class="kpi">
+              <div class="title">Měsíční splátka hypo</div>
+              <div class="value" id="kpiPayment">–</div>
+            </div>
+            <div class="kpi">
+              <div class="title">Celkem zaplaceno (hypo)</div>
+              <div class="value" id="kpiLoanTotal">–</div>
+            </div>
+            <div class="kpi">
+              <div class="title">Budoucí hodnota investice</div>
+              <div class="value" id="kpiInvFV">–</div>
+            </div>
+          </div>
+
+          <div class="chart-inner" style="margin-top:14px" aria-label="Rozklad investice na vklady a zhodnocení">
+            <canvas id="investBreakdownChart"></canvas>
+          </div>
+
+          <footer class="note">Investice počítá měsíční kapitalizaci a úložku <strong>na konci měsíce</strong>. Výsledky jsou orientační – nezohledňují inflaci, daně ani poplatky.</footer>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script>
+    /* ======= utils ======= */
+    const $ = (id)=> document.getElementById(id);
+    const fmtCZK0 = new Intl.NumberFormat('cs-CZ', { style:'currency', currency:'CZK', maximumFractionDigits:0 });
+
+    function parseNum(v){
+      return Number(String(v).replace(/[\s\u00A0\u202F]/g,'').replace(/\.(?=\d{3}(\D|$))/g,'').replace(',', '.')) || 0;
+    }
+    function formatInput(el, dec=0){
+      el.value = String(el.value ?? '').replace(/[\s\u00A0\u202F]/g,'').replace(',', '.');
+      const n = Number(el.value)||0;
+      const out = dec ? n.toFixed(dec) : Math.round(n).toString();
+      el.value = out.replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g,' ');
+    }
+    function getVar(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+    function debounce(fn, ms=100){ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a), ms); }; }
+
+    // Deep-link
+    function readParams(defaults){
+      const p = new URLSearchParams(location.search); const out={...defaults};
+      for (const k of Object.keys(defaults)){
+        if (!p.has(k)) continue;
+        const raw = p.get(k);
+        out[k] = typeof defaults[k] === 'number' ? parseNum(raw) : raw;
+      }
+      return out;
+    }
+    function writeParams(obj){
+      const p = new URLSearchParams();
+      for (const [k,v] of Object.entries(obj)) p.set(k, String(v));
+      history.replaceState(null, '', '?'+p.toString());
+    }
+
+    /* ======= finance (měsíční krok) ======= */
+    // anuitní splátka (měsíční)
+    function annuityPayment(P, rAnnualPct, years){
+      const n = Math.max(1, Math.round(years*12));
+      const r = (Number(rAnnualPct)||0)/100/12;
+      if (r === 0) return P / n;
+      return P * r / (1 - Math.pow(1+r, -n));
+    }
+
+    // amortizační série zůstatků (včetně prvního bodu 0 = P)
+    function loanBalances(P, rAnnualPct, years){
+      const n = Math.max(1, Math.round(years*12));
+      const r = (Number(rAnnualPct)||0)/100/12;
+      const A = annuityPayment(P, rAnnualPct, years);
+      const series = new Array(n+1);
+      let bal = P; series[0]=bal;
+      for(let m=1;m<=n;m++){
+        bal = bal*(1+r) - A;
+        if (bal < 0) bal = 0;
+        series[m]=bal;
+      }
+      return { series, payment:A, months:n };
+    }
+
+    // investiční série (konec měsíce: úrok -> vklad)
+    function investmentSeries(P0, PMT, rAnnualPct, years){
+      const n = Math.max(0, Math.round(years*12));
+      const r = (Number(rAnnualPct)||0)/100/12;
+      const total = new Array(n+1), deposits = new Array(n+1);
+      let bal=P0, contrib=P0;
+      total[0]=bal; deposits[0]=contrib;
+      for(let m=1;m<=n;m++){
+        bal *= (1+r);      // úrok
+        bal += PMT;        // vklad na konci měsíce
+        contrib += PMT;
+        total[m]=bal; deposits[m]=contrib;
+      }
+      return { total, deposits, months:n };
+    }
+
+    /* ======= grafy – jednorázová inicializace ======= */
+    const baseOptions = {
+      responsive:true, maintainAspectRatio:false, animation:false,
+      interaction:{ mode:'nearest', intersect:false },
+      plugins:{
+        legend:{ labels:{ color: getVar('--text') }},
+        tooltip:{ callbacks:{ label:(c)=> {
+          const v = Math.round(c.parsed.y||0).toLocaleString('cs-CZ');
+          return `${c.dataset.label}: ${v} Kč`;
+        }}}
+      },
+      scales:{
+        x:{ ticks:{ color:getVar('--text') }, grid:{ color:'transparent' }},
+        y:{ ticks:{ color:getVar('--text'), callback:v=>v.toLocaleString('cs-CZ') }, grid:{ color:getVar('--grid') } }
+      }
+    };
+
+    const combinedChart = new Chart($('combinedChart').getContext('2d'), {
+      type:'line',
+      data:{ labels:[], datasets:[
+        {label:'Zůstatek hypotéky', data:[], borderColor:getVar('--brand'), pointBackgroundColor:getVar('--brand'), borderWidth:2, tension:.2},
+        {label:'Hodnota investice', data:[], borderColor:getVar('--accent'), pointBackgroundColor:getVar('--accent'), borderWidth:2, tension:.2}
+      ]},
+      options: baseOptions
+    });
+
+    const investBreakdownChart = new Chart($('investBreakdownChart').getContext('2d'), {
+      type:'line',
+      data:{ labels:[], datasets:[
+        {label:'Vložené prostředky', data:[], borderWidth:1.5, tension:.2, fill:true, stack:'invest',
+         backgroundColor:'rgba(121,230,161,0.18)', borderColor:'rgba(121,230,161,0.95)'},
+        {label:'Zhodnocení', data:[], borderWidth:1.5, tension:.2, fill:true, stack:'invest',
+         backgroundColor:'rgba(108,163,255,0.18)', borderColor:'rgba(108,163,255,0.95)'}
+      ]},
+      options: {
+        ...baseOptions,
+        scales:{
+          x:{ ...baseOptions.scales.x, stacked:true },
+          y:{ ...baseOptions.scales.y, stacked:true }
+        }
+      }
+    });
+
+    function renderCombined(labels, loanSeries, invSeries){
+      combinedChart.data.labels = labels;
+      combinedChart.data.datasets[0].data = loanSeries;
+      combinedChart.data.datasets[1].data = invSeries;
+      combinedChart.update('none');
+    }
+    function renderBreakdown(labels, deposits, gains){
+      investBreakdownChart.data.labels = labels;
+      investBreakdownChart.data.datasets[0].data = deposits;
+      investBreakdownChart.data.datasets[1].data = gains;
+      investBreakdownChart.update('none');
+    }
+
+    /* ======= stránka ======= */
+    const els = {
+      loan: $('loan'), loanRate: $('loanRate'), loanYears: $('loanYears'),
+      lump: $('lump'), monthly: $('monthly'), invRate: $('invRate'),
+      form: $('calcForm'), reset: $('resetBtn'), share: $('shareBtn'),
+      kpiPayment: $('kpiPayment'), kpiLoanTotal: $('kpiLoanTotal'), kpiInvFV: $('kpiInvFV'),
+    };
+
+    function update(){
+      // formát vstupů (lokalizace)
+      formatInput(els.loan,0); formatInput(els.loanRate,2); formatInput(els.loanYears,0);
+      formatInput(els.lump,0); formatInput(els.monthly,0); formatInput(els.invRate,2);
+
+      const loan = parseNum(els.loan.value);
+      const loanRate = parseNum(els.loanRate.value);
+      const loanYears = Math.max(1, parseNum(els.loanYears.value));
+
+      const lump = parseNum(els.lump.value);
+      const monthly = parseNum(els.monthly.value);
+      const invRate = parseNum(els.invRate.value);
+
+      // Deep-link do URL
+      writeParams({ loan, loanRate, loanYears, lump, monthly, invRate });
+
+      // Výpočty
+      const { series: loanSer, payment: A, months:n } = loanBalances(loan, loanRate, loanYears);
+      const { total: invSer, deposits } = investmentSeries(lump, monthly, invRate, loanYears);
+      const gains = invSer.map((v,i)=> Math.max(0, v - deposits[i]));
+
+      // Roční sampling (0..n po 12 měsících)
+      const labels=[], loanY=[], invY=[], depY=[], gainY=[];
+      for(let m=0;m<=n;m+=12){ labels.push(`${Math.round(m/12)}. rok`); loanY.push(loanSer[m]); invY.push(invSer[m]); depY.push(deposits[m]); gainY.push(gains[m]); }
+      if (n%12!==0){ labels.push(`${(n/12).toFixed(1)}. rok`); loanY.push(loanSer[n]); invY.push(invSer[n]); depY.push(deposits[n]); gainY.push(gains[n]); }
+
+      // KPI
+      const loanTotalPaid = Math.round(A*n);
+      const invFV = invSer[invSer.length-1];
+
+      els.kpiPayment.textContent = fmtCZK0.format(A);
+      els.kpiLoanTotal.textContent = fmtCZK0.format(loanTotalPaid);
+      els.kpiInvFV.textContent = fmtCZK0.format(invFV);
+
+      // Grafy
+      renderCombined(labels, loanY, invY);
+      renderBreakdown(labels, depY, gainY);
+    }
+
+    const updateDebounced = debounce(update, 80);
+
+    // Inicializace z URL
+    (function initFromURL(){
+      const p = readParams({
+        loan: 7000000, loanRate: 5.49, loanYears: 30,
+        lump: 500000, monthly: 7000, invRate: 9
+      });
+      els.loan.value = p.loan.toLocaleString('cs-CZ');
+      els.loanRate.value = p.loanRate.toFixed(2).replace('.',',');
+      els.loanYears.value = p.loanYears.toLocaleString('cs-CZ');
+      els.lump.value = p.lump.toLocaleString('cs-CZ');
+      els.monthly.value = p.monthly.toLocaleString('cs-CZ');
+      els.invRate.value = p.invRate.toFixed(2).replace('.',',');
+    })();
+
+    // Handlery
+    els.form.addEventListener('submit', e=>{ e.preventDefault(); update(); });
+    ['input','change','blur'].forEach(evt=>{
+      [els.loan,els.loanRate,els.loanYears,els.lump,els.monthly,els.invRate]
+        .forEach(el=> el.addEventListener(evt, updateDebounced, {passive:true}));
+    });
+
+    els.reset.addEventListener('click', ()=>{
+      els.loan.value='7 000 000'; els.loanRate.value='5,49'; els.loanYears.value='30';
+      els.lump.value='500 000'; els.monthly.value='7 000'; els.invRate.value='9,00';
+      update();
+    });
+
+    els.share.addEventListener('click', async ()=>{
+      const url = location.href;
+      if (navigator.share){
+        try { await navigator.share({title:document.title, url}); } catch(_) {}
+      } else {
+        try { await navigator.clipboard.writeText(url); alert('Odkaz zkopírován do schránky.'); }
+        catch { prompt('Zkopíruj odkaz:', url); }
+      }
+    });
+
+    // První výpočet + resize
+    update();
+    window.addEventListener('resize', updateDebounced, {passive:true});
+  </script>
+</body>
+</html>
