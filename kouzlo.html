@@ -1,4 +1,4 @@
-<!doctype html>
+<!doctype html> 
 <html lang="cs">
 <head>
   <meta charset="utf-8" />
@@ -105,7 +105,7 @@
       <a href="index.html" id="nav-uroceni">Složené úročení</a>
       <a href="renta.html" id="nav-renta">Finanční nezávislost</a>
       <a class="active" href="kouzlo.html" id="nav-kouzlo">Kouzlo složeného úročení</a>
-	<a href="hypoinv.html" id="nav-hypo">Hypotéka vs. investice</a>
+      <a href="hypoinv.html" id="nav-hypo">Hypotéka vs. investice</a>
     </div>
   </nav>
 
@@ -134,7 +134,7 @@
               </div>
             </div>
             <div class="field">
-              <label for="rate">Roční zhodnocení – vstupní hodnota (% p.a.)</label>
+              <label for="rate">Roční zhodnocení – vstupní hodnota (% p.a.) <span style="color:var(--muted);font-weight:400">(↑/↓ = ±0,25 p. b., Shift = ±1)</span></label>
               <div class="input"><span>📈</span>
                 <input id="rate" type="text" inputmode="decimal" enterkeyhint="done" value="6,00" spellcheck="false" />
               </div>
@@ -220,14 +220,35 @@
     const yearsArr=[1,5,10,20,30];
     let chart;
 
-    function update(){
-      const lump=parseNum($('lump').value),
-            monthly=parseNum($('monthly').value),
-            baseRate=parseNum($('rate').value);
+    // --- univerzální „klikni-a-přepiš“ (select-all) ---
+    function enableSelectAll(el){
+      el.addEventListener('focus', () => { el.select(); el.dataset.selAll='1'; });
+      el.addEventListener('mouseup', (e) => {
+        if (el.dataset.selAll) { e.preventDefault(); delete el.dataset.selAll; } // neodznačit první klik
+      });
+    }
 
-      // Zapis do URL (deep-link)
+    // --- speciální UX pro sazbu (% p.a.) ---
+    function getRate(){ return parseNum($('rate').value); }
+    function setRate(v){
+      const n = Number.isFinite(+v) ? +v : 0;
+      $('rate').value = n.toFixed(2).replace('.',',');
+    }
+    function stepRate(delta){
+      const next = Math.max(-100, Math.min(100, getRate() + delta));
+      setRate(next);
+      update();
+    }
+
+    function update(){
+      const lump = parseNum($('lump').value),
+            monthly = parseNum($('monthly').value),
+            baseRate = parseNum($('rate').value);
+
+      // Deep-link
       writeParams({ lump, monthly, rate: baseRate });
 
+      // Nadpis sloupce pro vstupní sazbu
       $('thBaseRate').textContent = baseRate.toLocaleString('cs-CZ', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' %';
 
       const rates=[baseRate,2,5,10];
@@ -300,22 +321,44 @@
       $('rate').value = p.rate.toFixed(2).replace('.',',');
     })();
 
-    // vstupy – formátování + submit
-    const lumpInput=$('lump'), monthlyInput=$('monthly'), rateInput=$('rate');
-    lumpInput.addEventListener('blur',()=>{formatInput(lumpInput,0); update();});
-    monthlyInput.addEventListener('blur',()=>{formatInput(monthlyInput,0); update();});
-    rateInput.addEventListener('blur',()=>{formatInput(rateInput,2); update();});
+    // „klikni-a-přepiš“ pro všechna pole
+    enableSelectAll($('lump'));
+    enableSelectAll($('monthly'));
+    enableSelectAll($('rate')); // sazba má navíc speciální ovládání níže
+
+    // Formátování na blur (sazbu formátujeme jen při opuštění pole)
+    $('lump').addEventListener('blur', ()=>{ formatInput($('lump'),0); update(); });
+    $('monthly').addEventListener('blur', ()=>{ formatInput($('monthly'),0); update(); });
+    $('rate').addEventListener('blur', ()=>{ formatInput($('rate'),2); update(); });
+
+    // Live přepočty – během psaní sazby nenecháváme formát měnit kurzor
     ['input','change'].forEach(evt=>{
-      [lumpInput,monthlyInput,rateInput].forEach(el=> el.addEventListener(evt, update, {passive:true}));
+      [$('lump'), $('monthly')].forEach(el => el.addEventListener(evt, update, {passive:true}));
     });
+    $('rate').addEventListener('input', ()=>{ update(); }); // bez formátu, jen výpočet
+
+    // Šipky a kolečko pro krokování sazby
+    $('rate').addEventListener('keydown', (e)=>{
+      if (e.key === 'ArrowUp'){ e.preventDefault(); stepRate(e.shiftKey ? 1 : 0.25); }
+      if (e.key === 'ArrowDown'){ e.preventDefault(); stepRate(e.shiftKey ? -1 : -0.25); }
+    });
+    $('rate').addEventListener('wheel', (e)=>{
+      if (document.activeElement === $('rate')) {
+        e.preventDefault();
+        stepRate(e.deltaY < 0 ? (e.shiftKey ? 1 : 0.25) : (e.shiftKey ? -1 : -0.25));
+      }
+    }, { passive:false });
+
+    // Submit / reset
     $('calcForm').addEventListener('submit', e=>{ e.preventDefault(); update(); });
-
-    // tlačítka
-    $('resetBtn').addEventListener('click',()=>{
-      lumpInput.value='100 000'; monthlyInput.value='3 000'; rateInput.value='6,00'; update();
+    $('resetBtn').addEventListener('click', ()=>{
+      $('lump').value='100 000';
+      $('monthly').value='3 000';
+      $('rate').value='6,00';
+      update();
     });
 
-    // zvýraznit aktivní záložku
+    // zvýraznit aktivní záložku (pro případ externího include)
     (function(){ $('nav-kouzlo')?.classList.add('active'); })();
 
     // první vykreslení
