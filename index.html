@@ -50,12 +50,10 @@
 <body>
   <nav class="topnav">
     <div class="inner">
-
       <a class="active" href="index.html" id="nav-uroceni">Složené úročení</a>
       <a href="renta.html" id="nav-renta">Finanční nezávislost</a>
       <a href="kouzlo.html" id="nav-kouzlo">Kouzlo složeného úročení</a>
-	<a href="hypoinv.html" id="nav-hypo">Hypotéka vs. investice</a>
-
+      <a href="hypoinv.html" id="nav-hypo">Hypotéka vs. investice</a>
     </div>
   </nav>
 
@@ -83,7 +81,7 @@
               </div>
             </div>
             <div class="field">
-              <label for="rate">Roční zhodnocení (% p.a.)</label>
+              <label for="rate">Roční zhodnocení (% p.a.) <span style="color:var(--muted);font-weight:400">(↑/↓ = ±0,25 p. b., Shift = ±1)</span></label>
               <div class="input"><span>📈</span>
                 <input id="rate" type="text" inputmode="decimal" enterkeyhint="done" placeholder="např. 6,00" value="6,00" spellcheck="false" />
               </div>
@@ -131,7 +129,11 @@
     const fmtCZK  = new Intl.NumberFormat('cs-CZ', { style:'currency', currency:'CZK', minimumFractionDigits:2 });
     const $ = (id)=>document.getElementById(id);
     function parseNum(v){ if (typeof v!=='string') return Number(v)||0; return Number(v.replace(/\s+/g,'').replace(/\.(?=\d{3}(\D|$))/g,'').replace(',', '.'))||0; }
-    function formatInput(el, dec=0){ el.value=String(el.value??'').replace(/\s+/g,'').replace(',', '.'); const n=Number(el.value)||0; el.value=(dec?n.toFixed(dec):Math.round(n).toString()).replace('.',',').replace(/\B(?=(\d{3})+(?!\d))/g,' '); }
+    function formatInput(el, dec=0){
+      el.value=String(el.value??'').replace(/\s+/g,'').replace(',', '.');
+      const n=Number(el.value)||0;
+      el.value=(dec?n.toFixed(dec):Math.round(n).toString()).replace('.',',').replace(/\B(?=(\d{3})+(?!\d))/g,' ');
+    }
     function shortCZK(n){ const a=Math.abs(n); if(a>=1e9)return(n/1e9).toFixed(2).replace('.',',')+' mld.'; if(a>=1e6)return(n/1e6).toFixed(2).replace('.',',')+' mil.'; if(a>=1e3)return(n/1e3).toFixed(1).replace('.',',')+' tis.'; return fmtCZK0.format(n);}
     function readParams(schema){ const p=new URLSearchParams(location.search); const out={}; for(const[k,def] of Object.entries(schema)){ if(!p.has(k)){out[k]=def;continue;} const raw=p.get(k); out[k]=typeof def==='number'?parseNum(raw):raw; } return out;}
     function writeParams(obj){ const p=new URLSearchParams(); for(const[k,v] of Object.entries(obj)){p.set(k,String(v));} history.replaceState(null,'','?'+p.toString()); }
@@ -150,8 +152,7 @@
     function cssVar(name, fallback){ const v=getComputedStyle(document.documentElement).getPropertyValue(name).trim(); return v||fallback; }
     function drawBarsAnnual(canvas, container, annualTotal, annualDeposits){
       const ctx=canvas.getContext('2d'), dpr=window.devicePixelRatio||1, pad=28;
-      const aspect=parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--chart-aspect'))||0.58;
-      const W=container.clientWidth||600, H=Math.max(220, Math.round(W*0.6)); // zjednodušené, stabilní
+      const W=container.clientWidth||600, H=Math.max(220, Math.round(W*0.6));
       canvas.width=W*dpr; canvas.height=H*dpr; canvas.style.width=W+'px'; canvas.style.height=H+'px'; ctx.setTransform(dpr,0,0,dpr,0,0);
       ctx.clearRect(0,0,W,H);
       const n=annualTotal.length; if(!n) return;
@@ -207,9 +208,30 @@
       reset: $('resetBtn'), form: $('calcForm')
     };
 
-    function update(){
-      formatInput(els.lump,0); formatInput(els.monthly,0); formatInput(els.rate,2); formatInput(els.years,0);
-      const P0=parseNum(els.lump.value), PMT=parseNum(els.monthly.value), rate=parseNum(els.rate.value), years=parseNum(els.years.value);
+    // --- UX vylepšení sazby ---
+    function getRate(){ return parseNum(els.rate.value); }
+    function setRate(v){
+      const n = Number.isFinite(+v) ? +v : 0;
+      els.rate.value = n.toFixed(2).replace('.',',');
+    }
+    function stepRate(delta){
+      const next = Math.max(-100, Math.min(100, getRate() + delta));
+      setRate(next);
+      update(); // s formátováním
+    }
+
+    // Hlavní update – možnost vypnout formátování sazby během psaní
+    function update(opts={ formatRate:true }){
+      formatInput(els.lump,0);
+      formatInput(els.monthly,0);
+      if (opts.formatRate) formatInput(els.rate,2); // sazbu formátujeme jen někdy
+      formatInput(els.years,0);
+
+      const P0=parseNum(els.lump.value),
+            PMT=parseNum(els.monthly.value),
+            rate=parseNum(els.rate.value),   // syrový vstup funguje i během psaní
+            years=parseNum(els.years.value);
+
       const {fv,annualTotal,annualDeposits,months} = computeAnnual(P0,PMT,rate,years);
       const deposited=P0+PMT*months, intr=fv-deposited;
 
@@ -230,15 +252,63 @@
     els.rate.value = p.rate.toFixed(2).replace('.',',');
     els.years.value = Intl.NumberFormat('cs-CZ').format(p.years);
 
-    // events
-    document.getElementById('calcForm').addEventListener('submit', e=>{e.preventDefault(); update();});
+    // form submit
+    els.form.addEventListener('submit', e=>{ e.preventDefault(); update(); });
+
+    // běžná pole – standardní live přepočet a formátování
     ['input','change'].forEach(evt=>{
-      [els.lump,els.monthly,els.rate,els.years].forEach(el=> el.addEventListener(evt, update, {passive:true}));
+      [els.lump,els.monthly,els.years].forEach(el=> el.addEventListener(evt, update, {passive:true}));
     });
-    els.reset.addEventListener('click', ()=>{ els.lump.value='100 000'; els.monthly.value='3 000'; els.rate.value='6,00'; els.years.value='20'; update(); });
+
+    // speciální handlery pro sazbu
+    // focus: select-all, první klik neodstraní výběr
+    els.rate.addEventListener('focus', () => {
+      els.rate.select();
+      els.rate.dataset.selAll = '1';
+    });
+    els.rate.addEventListener('mouseup', (e) => {
+      if (els.rate.dataset.selAll) { e.preventDefault(); delete els.rate.dataset.selAll; }
+    });
+
+    // během psaní: neformátovat, ale hned přepočítat
+    els.rate.addEventListener('input', () => {
+      update({ formatRate:false });
+    });
+
+    // po opuštění: hezky doformátovat
+    els.rate.addEventListener('blur', () => {
+      setRate(getRate());
+      update(); // zpět s formátováním
+    });
+
+    // šipky: jemné/rychlé kroky
+    els.rate.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowUp') { e.preventDefault(); stepRate(e.shiftKey ? 1 : 0.25); }
+      if (e.key === 'ArrowDown') { e.preventDefault(); stepRate(e.shiftKey ? -1 : -0.25); }
+    });
+
+    // kolečko myši při focusu funguje jako krokování
+    els.rate.addEventListener('wheel', (e) => {
+      if (document.activeElement === els.rate) {
+        e.preventDefault();
+        stepRate(e.deltaY < 0 ? (e.shiftKey ? 1 : 0.25) : (e.shiftKey ? -1 : -0.25));
+      }
+    }, { passive:false });
+
+    // reset
+    els.reset.addEventListener('click', ()=>{
+      els.lump.value='100 000';
+      els.monthly.value='3 000';
+      els.rate.value='6,00';
+      els.years.value='20';
+      update();
+    });
+
+    // resize & observer
     window.addEventListener('resize', update, {passive:true});
     new ResizeObserver(update).observe(els.chartInner);
 
+    // první vykreslení
     update();
   </script>
 </body>
