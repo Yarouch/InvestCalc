@@ -130,7 +130,7 @@
               </div>
             </div>
             <div class="field">
-              <label for="loanRate">Úrok hypotéky (% p.a.)</label>
+              <label for="loanRate">Úrok hypotéky (% p.a.) <span style="color:var(--muted);font-weight:400">(↑/↓ = ±0,25 p. b., Shift = ±1)</span></label>
               <div class="input"><span>📉</span>
                 <input id="loanRate" type="text" inputmode="decimal" enterkeyhint="done" value="5,49" spellcheck="false" />
               </div>
@@ -156,7 +156,7 @@
               </div>
             </div>
             <div class="field">
-              <label for="invRate">Roční zhodnocení investice (% p.a.)</label>
+              <label for="invRate">Roční zhodnocení investice (% p.a.) <span style="color:var(--muted);font-weight:400">(↑/↓ = ±0,25 p. b., Shift = ±1)</span></label>
               <div class="input"><span>📈</span>
                 <input id="invRate" type="text" inputmode="decimal" enterkeyhint="done" value="9,00" spellcheck="false" />
               </div>
@@ -164,7 +164,7 @@
 
             <div class="actions">
               <button class="btn primary" type="submit">Přepočítat</button>
-              <button class="btn" type="button" id="resetBtn">Reset</button>
+              <button class="btn" type="button" id="resetBtn">Vyčistit</button>
               <button class="btn ghost" type="button" id="shareBtn">Sdílet</button>
             </div>
           </form>
@@ -351,10 +351,34 @@
       kpiPayment: $('kpiPayment'), kpiLoanTotal: $('kpiLoanTotal'), kpiInvFV: $('kpiInvFV'),
     };
 
-    function update(){
-      // formát vstupů (lokalizace)
-      formatInput(els.loan,0); formatInput(els.loanRate,2); formatInput(els.loanYears,0);
-      formatInput(els.lump,0); formatInput(els.monthly,0); formatInput(els.invRate,2);
+    /* --- univerzální „klikni-a-přepiš“ --- */
+    function enableSelectAll(el){
+      el.addEventListener('focus', ()=>{ el.select(); el.dataset.selAll='1'; });
+      el.addEventListener('mouseup', (e)=>{ if (el.dataset.selAll){ e.preventDefault(); delete el.dataset.selAll; } });
+    }
+    [els.loan, els.loanYears, els.lump, els.monthly].forEach(enableSelectAll);
+
+    /* --- speciální UX pro sazby (% p.a.) --- */
+    enableSelectAll(els.loanRate);
+    enableSelectAll(els.invRate);
+
+    const clampPct = (v)=> Math.max(-100, Math.min(100, v));
+    const getLoanRate = ()=> parseNum(els.loanRate.value);
+    const setLoanRate = (v)=>{ els.loanRate.value = (Number(v)||0).toFixed(2).replace('.',','); };
+    const stepLoanRate = (d)=>{ setLoanRate(clampPct(getLoanRate()+d)); update(); };
+
+    const getInvRate = ()=> parseNum(els.invRate.value);
+    const setInvRate = (v)=>{ els.invRate.value = (Number(v)||0).toFixed(2).replace('.',','); };
+    const stepInvRate = (d)=>{ setInvRate(clampPct(getInvRate()+d)); update(); };
+
+    function update(opts={ formatRates:true }){
+      // formátování vstupů (sazby jen pokud chceme – ne při psaní)
+      formatInput(els.loan,0);
+      if (opts.formatRates) formatInput(els.loanRate,2);
+      formatInput(els.loanYears,0);
+      formatInput(els.lump,0);
+      formatInput(els.monthly,0);
+      if (opts.formatRates) formatInput(els.invRate,2);
 
       const loan = parseNum(els.loan.value);
       const loanRate = parseNum(els.loanRate.value);
@@ -406,20 +430,49 @@
       els.invRate.value = p.invRate.toFixed(2).replace('.',',');
     })();
 
-    // Handlery
+    // Handlery – ostatní pole: standardní live přepočet
     els.form.addEventListener('submit', e=>{ e.preventDefault(); update(); });
     ['input','change','blur'].forEach(evt=>{
-      [els.loan,els.loanRate,els.loanYears,els.lump,els.monthly,els.invRate]
+      [els.loan, els.loanYears, els.lump, els.monthly]
         .forEach(el=> el.addEventListener(evt, updateDebounced, {passive:true}));
     });
 
-    els.reset.addEventListener('click', ()=>{
+    // Sazby – při psaní neformátovat, doformátovat až na blur, krokování šipkami a kolečkem
+    els.loanRate.addEventListener('input', ()=> update({ formatRates:false }));
+    els.invRate.addEventListener('input',  ()=> update({ formatRates:false }));
+
+    els.loanRate.addEventListener('blur', ()=>{ setLoanRate(getLoanRate()); update(); });
+    els.invRate.addEventListener('blur',  ()=>{ setInvRate(getInvRate());   update(); });
+
+    els.loanRate.addEventListener('keydown', (e)=>{
+      if (e.key === 'ArrowUp')   { e.preventDefault(); stepLoanRate(e.shiftKey ? 1 : 0.25); }
+      if (e.key === 'ArrowDown') { e.preventDefault(); stepLoanRate(e.shiftKey ? -1 : -0.25); }
+    });
+    els.invRate.addEventListener('keydown', (e)=>{
+      if (e.key === 'ArrowUp')   { e.preventDefault(); stepInvRate(e.shiftKey ? 1 : 0.25); }
+      if (e.key === 'ArrowDown') { e.preventDefault(); stepInvRate(e.shiftKey ? -1 : -0.25); }
+    });
+
+    els.loanRate.addEventListener('wheel', (e)=>{
+      if (document.activeElement === els.loanRate){
+        e.preventDefault();
+        stepLoanRate(e.deltaY < 0 ? (e.shiftKey ? 1 : 0.25) : (e.shiftKey ? -1 : -0.25));
+      }
+    }, { passive:false });
+    els.invRate.addEventListener('wheel', (e)=>{
+      if (document.activeElement === els.invRate){
+        e.preventDefault();
+        stepInvRate(e.deltaY < 0 ? (e.shiftKey ? 1 : 0.25) : (e.shiftKey ? -1 : -0.25));
+      }
+    }, { passive:false });
+
+    // Reset & Sdílení
+    $('resetBtn').addEventListener('click', ()=>{
       els.loan.value='7 000 000'; els.loanRate.value='5,49'; els.loanYears.value='30';
       els.lump.value='500 000'; els.monthly.value='7 000'; els.invRate.value='9,00';
       update();
     });
-
-    els.share.addEventListener('click', async ()=>{
+    $('shareBtn').addEventListener('click', async ()=>{
       const url = location.href;
       if (navigator.share){
         try { await navigator.share({title:document.title, url}); } catch(_) {}
