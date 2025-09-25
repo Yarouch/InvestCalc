@@ -105,7 +105,7 @@
       <a href="index.html" id="nav-uroceni">Složené úročení</a>
       <a class="active" href="renta.html" id="nav-renta">Finanční nezávislost</a>
       <a href="kouzlo.html" id="nav-kouzlo">Kouzlo složeného úročení</a>
-	<a href="hypoinv.html" id="nav-hypo">Hypotéka vs. investice</a>
+      <a href="hypoinv.html" id="nav-hypo">Hypotéka vs. investice</a>
     </div>
   </nav>
 
@@ -138,7 +138,7 @@
               <div class="input"><span>🎯</span><input id="ageRent" type="text" inputmode="numeric" enterkeyhint="done" value="55" spellcheck="false" /></div>
             </div>
             <div class="field">
-              <label for="expReturn">Očekávané roční zhodnocení do renty (% p.a.)</label>
+              <label for="expReturn">Očekávané roční zhodnocení do renty (% p.a.) <span style="color:var(--muted);font-weight:400">(↑/↓ = ±0,25 p. b., Shift = ±1)</span></label>
               <div class="input"><span>📈</span><input id="expReturn" type="text" inputmode="decimal" enterkeyhint="done" value="6,00" spellcheck="false" /></div>
             </div>
 
@@ -356,8 +356,37 @@
       canvas: $('c'), chartInner: $('chartInner')
     };
 
-    function update(){
-      formatInput(els.rent,0); formatInput(els.invested,0); formatInput(els.ageNow,0); formatInput(els.ageRent,0); formatInput(els.rate,2);
+    /* --- univerzální „klikni-a-přepiš“ --- */
+    function enableSelectAll(el){
+      el.addEventListener('focus', () => {
+        el.select();
+        el.dataset.selAll = '1';
+      });
+      el.addEventListener('mouseup', (e) => {
+        if (el.dataset.selAll) { e.preventDefault(); delete el.dataset.selAll; }
+      });
+    }
+    [els.rent, els.invested, els.ageNow, els.ageRent].forEach(enableSelectAll);
+
+    /* --- speciální UX pro sazbu (% p.a.) --- */
+    enableSelectAll(els.rate); // také select-all
+    function getRate(){ return parseNum(els.rate.value); }
+    function setRate(v){
+      const n = Number.isFinite(+v) ? +v : 0;
+      els.rate.value = n.toFixed(2).replace('.', ',');
+    }
+    function stepRate(delta){
+      const next = Math.max(-100, Math.min(100, getRate() + delta));
+      setRate(next);
+      update(); // s formátováním
+    }
+
+    function update(opts={ formatRate:true }){
+      formatInput(els.rent,0);
+      formatInput(els.invested,0);
+      formatInput(els.ageNow,0);
+      formatInput(els.ageRent,0);
+      if (opts.formatRate) formatInput(els.rate,2); // sazbu formátujeme jen někdy
 
       const rent = parseNum(els.rent.value);
       const P0   = parseNum(els.invested.value);
@@ -386,10 +415,8 @@
       }
 
       els.results.hidden = false;
-
       drawAreaMonthly(els.canvas, els.chartInner, totals, deposits, years, goal);
 
-      // deep-link
       writeParams({ rentMonthly:rent, investedNow:P0, ageNow:age0, ageRent:ageR, expReturn:rate });
     }
 
@@ -401,17 +428,38 @@
     els.ageRent.value  = Intl.NumberFormat('cs-CZ').format(p.ageRent);
     els.rate.value     = p.expReturn.toFixed(2).replace('.',',');
 
-    // Events
+    // Live přepočet (ostatní pole)
     const live = debounce(update, 80);
     els.form.addEventListener('submit', e=>{ e.preventDefault(); update(); });
     ['input','change'].forEach(evt=>{
-      [els.rent,els.invested,els.ageNow,els.ageRent,els.rate].forEach(el=> el.addEventListener(evt, live, {passive:true}));
+      [els.rent,els.invested,els.ageNow,els.ageRent].forEach(el=> el.addEventListener(evt, live, {passive:true}));
     });
+
+    // Sazba – během psaní neformátovat, doformátovat na blur, šipky/scroll
+    els.rate.addEventListener('input', () => { update({ formatRate:false }); });
+    els.rate.addEventListener('blur',  () => { setRate(getRate()); update(); });
+    els.rate.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowUp')   { e.preventDefault(); stepRate(e.shiftKey ? 1 : 0.25); }
+      if (e.key === 'ArrowDown') { e.preventDefault(); stepRate(e.shiftKey ? -1 : -0.25); }
+    });
+    els.rate.addEventListener('wheel', (e) => {
+      if (document.activeElement === els.rate) {
+        e.preventDefault();
+        stepRate(e.deltaY < 0 ? (e.shiftKey ? 1 : 0.25) : (e.shiftKey ? -1 : -0.25));
+      }
+    }, { passive:false });
+
+    // reset
     els.reset.addEventListener('click', ()=>{
-      els.rent.value='30 000'; els.invested.value='500 000'; els.ageNow.value='35'; els.ageRent.value='55'; els.rate.value='6,00';
+      els.rent.value='30 000';
+      els.invested.value='500 000';
+      els.ageNow.value='35';
+      els.ageRent.value='55';
+      els.rate.value='6,00';
       update();
     });
 
+    // resize & observer
     window.addEventListener('resize', live, {passive:true});
     if ('ResizeObserver' in window) new ResizeObserver(live).observe(els.chartInner);
 
