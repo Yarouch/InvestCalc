@@ -1,0 +1,364 @@
+<!doctype html>
+<html lang="cs">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Kalkulačka inflace</title>
+  <style>
+    :root{
+      /* Tmavé téma (výchozí) – sjednocené s ostatními stránkami */
+      --bg: linear-gradient(180deg, #080A0E 0%, #0B0C10 40%, #0E1014 100%);
+      --panel:#12141a; --muted:#9aa3b2; --text:#e6e9ef; --brand:#4f8cff; --accent:#79e6a1;
+      --grid: rgba(255,255,255,.08); --radius:14px; --ring:0 0 0 3px rgba(79,140,255,.25);
+      --chart-aspect:.6;
+      color-scheme: light dark;
+    }
+    @media (prefers-color-scheme: light){
+      :root{
+        --bg: linear-gradient(180deg,#fff 0%,#f6f8fb 60%,#eef3f9 100%);
+        --panel:#ffffff; --muted:#667085; --text:#0b0c10; --brand:#375dfb; --accent:#00b36b; --grid: rgba(0,0,0,.08);
+      }
+    }
+
+    *{box-sizing:border-box}
+    body{
+      margin:0; font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Arial; color:var(--text); background:var(--bg);
+      min-height:100svh; padding-bottom:env(safe-area-inset-bottom)
+    }
+
+    /* Horní navigace (matching) */
+    .topnav{
+      position:sticky; top:0; z-index:100; background:rgba(18,20,26,.8); border-bottom:1px solid rgba(255,255,255,.06);
+      padding-top:max(10px, env(safe-area-inset-top)); backdrop-filter:blur(6px)
+    }
+    .topnav .inner{max-width:1100px; margin:0 auto; padding:10px 20px; display:flex; gap:12px; align-items:center}
+    .topnav a{display:inline-block; padding:10px 12px; border-radius:12px; text-decoration:none; color:#fff; border:1px solid transparent; font-weight:600;}
+    .topnav a.active{ background:linear-gradient(135deg,var(--brand),#6aa8ff); color:#fff; box-shadow:0 8px 20px rgba(79,140,255,.35) }
+    @media (prefers-color-scheme: light){
+      .topnav{ background:rgba(255,255,255,.75); border-bottom:1px solid rgba(0,0,0,.06) }
+      .topnav a{ color:#0b0c10 }
+      .topnav a.active{ color:#fff }
+    }
+
+    .wrap{ max-width:1100px; margin:min(6vh,48px) auto; padding:20px;
+      padding-left:max(20px,env(safe-area-inset-left)); padding-right:max(20px,env(safe-area-inset-right));
+    }
+    header{margin-bottom:18px}
+    h1{font-size:clamp(22px, 3.5vw, 32px); line-height:1.2; margin:0 0 6px}
+    .lead{color:var(--muted); margin:0}
+
+    /* Dvousloupec */
+    .grid{ display:grid; grid-template-columns: 400px 1fr; gap:22px; align-items:start }
+    @media (max-width: 900px){ .grid{ grid-template-columns: 1fr } }
+
+    .card{
+      border:1px solid rgba(255,255,255,.08); border-radius:var(--radius);
+      background:linear-gradient(180deg,rgba(255,255,255,.02),rgba(255,255,255,0)); box-shadow:0 10px 30px rgba(0,0,0,.35)
+    }
+    .card .head{ padding:16px 16px 8px; border-bottom:1px solid rgba(255,255,255,.06) }
+    .card .body{ padding:16px }
+    @media (prefers-color-scheme: light){ .card .head{border-bottom-color:rgba(0,0,0,.06)} }
+
+    /* Formulář */
+    form{ display:grid; gap:12px }
+    .field label{ display:block; font-weight:700; margin:0 0 6px; color:var(--text) }
+    .hint{ color:var(--muted); font-size:.9rem; margin-top:4px }
+    .input{
+      display:flex; align-items:center; gap:8px; padding:10px 12px; border-radius:12px;
+      border:1px solid rgba(255,255,255,.10); background:rgba(0,0,0,.12)
+    }
+    .input:focus-within{ box-shadow:var(--ring); border-color:rgba(79,140,255,.3) }
+    .input span{ opacity:.85; color:var(--text) }
+    input{
+      appearance:none; border:0; outline:0; background:transparent; width:100%; color:var(--text); font:inherit
+    }
+    input::placeholder{ color:rgba(255,255,255,.65) }
+    @media (prefers-color-scheme: light){ input::placeholder{ color:rgba(0,0,0,.55)} }
+    :where(a,button,input):focus-visible{ outline:none; box-shadow:var(--ring) }
+
+    .actions{ display:flex; gap:8px; flex-wrap:wrap; margin-top:4px }
+    .btn{ border-radius:12px; border:1px solid rgba(255,255,255,.12); background:rgba(255,255,255,.06); color:var(--text); font-weight:700; padding:10px 14px; cursor:pointer }
+    .btn.primary{ background:linear-gradient(135deg,var(--brand),#6aa8ff); border-color:transparent; color:#fff; box-shadow:0 8px 20px rgba(79,140,255,.35) }
+
+    /* Pravý sloupec */
+    .legend{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; color:var(--muted) }
+    .dot{ width:12px; height:12px; border-radius:3px; display:inline-block }
+    .dot.brand{ background:var(--brand) }
+    .dot.accent{ background:var(--accent) }
+
+    .chart{ padding:14px }
+    .chart-inner{ position:relative; aspect-ratio:16 / var(--chart-aspect); width:100% }
+    canvas{ width:100%; height:100%; display:block; background:transparent }
+
+    .kpis{ display:grid; grid-template-columns: repeat(3,1fr); gap:12px; margin-top:10px }
+    @media (max-width: 640px){ .kpis{ grid-template-columns:1fr } }
+    .kpi{ padding:12px; border-radius:12px; border:1px solid rgba(255,255,255,.08); background:linear-gradient(180deg,rgba(255,255,255,.02),rgba(255,255,255,0)); }
+    .kpi .title{ color:var(--muted); font-size:13px; font-weight:700; letter-spacing:.02em; text-transform:uppercase }
+    .kpi .value{ font-size:clamp(18px,3.5vw,26px); font-weight:900; color:var(--text); }
+
+    footer.note{ color:var(--muted); font-size:14px; margin-top:8px }
+  </style>
+</head>
+<body>
+  <nav class="topnav">
+    <div class="inner">
+      <a href="index.html" id="nav-uroceni">Složené úročení</a>
+      <a href="renta.html" id="nav-renta">Finanční nezávislost</a>
+      <a href="kouzlo.html" id="nav-kouzlo">Kouzlo složeného úročení</a>
+      <a href="hypoinv.html" id="nav-hypo">Hypotéka vs. investice</a>
+      <a class="active" href="inflace.html" id="nav-inflace">Kalkulačka inflace</a>
+    </div>
+  </nav>
+
+  <div class="wrap">
+    <header>
+      <h1>Kalkulačka inflace</h1>
+      <p class="lead">Zjisti, jak inflace ovlivní kupní sílu peněz. Zadaná částka se sama nezhodnocuje (jen „leží“), proto její <strong>reálná hodnota klesá</strong>. Zobrazíme i to, <strong>kolik bude potřeba nominálně</strong>, aby měla stejnou kupní sílu jako dnes.</p>
+    </header>
+
+    <div class="grid">
+      <!-- Vstupy -->
+      <section class="card" aria-labelledby="formHeading">
+        <div class="head"><h2 id="formHeading">Vstupy</h2></div>
+        <div class="body">
+          <form id="calcForm" autocomplete="off">
+            <div class="field">
+              <label for="amount">Počáteční částka (Kč)</label>
+              <div class="input"><span>💰</span>
+                <input id="amount" type="text" inputmode="decimal" enterkeyhint="done" value="500 000" spellcheck="false" />
+              </div>
+              <div class="hint">Kolik peněz máš dnes (bez zhodnocení či úroku).</div>
+            </div>
+
+            <div class="field">
+              <label for="infl">Předpokládaná roční míra inflace (% p.a.) <span style="color:var(--muted);font-weight:400">(↑/↓ = ±0,25 p. b., Shift = ±1)</span></label>
+              <div class="input"><span>📈</span>
+                <input id="infl" type="text" inputmode="decimal" enterkeyhint="done" value="3,00" spellcheck="false" />
+              </div>
+              <div class="hint">Průměrná inflace za celé období (nemění se rok od roku).</div>
+            </div>
+
+            <div class="field">
+              <label for="years">Na kolik let</label>
+              <div class="input"><span>⏳</span>
+                <input id="years" type="text" inputmode="numeric" enterkeyhint="done" value="10" spellcheck="false" />
+              </div>
+              <div class="hint">Délka období, po které inflaci zohledníme.</div>
+            </div>
+
+            <div class="actions">
+              <button class="btn primary" type="submit">Spočítat</button>
+              <button class="btn" type="button" id="resetBtn">Vyčistit</button>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <!-- Výstupy -->
+      <section class="card" aria-labelledby="chartHeading">
+        <div class="head">
+          <h2 id="chartHeading">Vývoj kupní síly</h2>
+          <div class="legend">
+            <span class="dot brand"></span> Potřebná budoucí částka (nominálně)
+            <span class="dot accent"></span> Reálná hodnota dnešní částky
+          </div>
+        </div>
+        <div class="body chart">
+          <div class="chart-inner">
+            <canvas id="chart"></canvas>
+          </div>
+
+          <div class="kpis" id="kpis" aria-live="polite" aria-atomic="true">
+            <div class="kpi">
+              <div class="title">Reálná hodnota za <span id="kpiYears">10</span> let</div>
+              <div class="value" id="kpiReal">–</div>
+            </div>
+            <div class="kpi">
+              <div class="title">Potřebná budoucí částka</div>
+              <div class="value" id="kpiNeeded">–</div>
+            </div>
+            <div class="kpi">
+              <div class="title">Kumulovaná inflace</div>
+              <div class="value" id="kpiCum">–</div>
+            </div>
+          </div>
+
+          <footer class="note">
+            Vysvětlivky: Inflace zvyšuje ceny. Aby měla částka stejnou kupní sílu jako dnes, musí v budoucnu narůst
+            o <em>kumulovanou inflaci</em>. „Reálná hodnota“ ukazuje, kolik by tvých dnešních peněz bylo „v dnešních cenách“
+            po zadaném období, pokud by se neúročily.
+          </footer>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script>
+    /* ===== utils ===== */
+    const $ = (id)=> document.getElementById(id);
+    const fmtCZK0 = new Intl.NumberFormat('cs-CZ', { style:'currency', currency:'CZK', maximumFractionDigits:0 });
+
+    function parseNum(v){
+      return Number(String(v).replace(/[\s\u00A0\u202F]/g,'').replace(/\.(?=\d{3}(\D|$))/g,'').replace(',', '.')) || 0;
+    }
+    function formatInput(el, dec=0){
+      el.value = String(el.value ?? '').replace(/[\s\u00A0\u202F]/g,'').replace(',', '.');
+      const n = Number(el.value)||0;
+      const out = dec ? n.toFixed(dec) : Math.round(n).toString();
+      el.value = out.replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g,' ');
+    }
+    function debounce(fn, ms=100){ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a), ms); }; }
+    function getVar(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+
+    // Deep-link
+    function readParams(defaults){
+      const p = new URLSearchParams(location.search); const out={...defaults};
+      for (const k of Object.keys(defaults)){
+        if (!p.has(k)) continue;
+        const raw = p.get(k);
+        out[k] = typeof defaults[k] === 'number' ? parseNum(raw) : raw;
+      }
+      return out;
+    }
+    function writeParams(obj){
+      const p = new URLSearchParams();
+      for (const [k,v] of Object.entries(obj)) p.set(k, String(v));
+      history.replaceState(null, '', '?'+p.toString());
+    }
+
+    /* ===== inflace – výpočty =====
+       F = (1 + i)^t
+       - Reálná hodnota dnešní částky po t letech (v dnešních cenách): amount / F
+       - Potřebná budoucí částka pro stejnou kupní sílu: amount * F
+       - Kumulovaná inflace: (F - 1)
+    */
+    function seriesInflation(amount, inflPct, years){
+      const i = (Number(inflPct)||0)/100;
+      const n = Math.max(0, Math.round(Number(years)||0));
+      const labels = Array.from({length:n+1}, (_,k)=> `${k}. rok`);
+      const F = (t)=> Math.pow(1+i, t);
+      const needed = labels.map((_,t)=> amount * F(t));
+      const real   = labels.map((_,t)=> amount / F(t));
+      return { labels, needed, real, factor: F(n) };
+    }
+
+    /* ===== graf ===== */
+    const baseOptions = {
+      responsive:true, maintainAspectRatio:true, animation:false,
+      interaction:{ mode:'nearest', intersect:false },
+      plugins:{
+        legend:{ labels:{ color: getVar('--text') }},
+        tooltip:{ callbacks:{ label:(c)=> {
+          const v = Math.round(c.parsed.y||0).toLocaleString('cs-CZ');
+          return `${c.dataset.label}: ${v} Kč`;
+        }}}
+      },
+      scales:{
+        x:{ ticks:{ color:getVar('--text') }, grid:{ color:'transparent' }},
+        y:{ ticks:{ color:getVar('--text'), callback:v=>v.toLocaleString('cs-CZ') }, grid:{ color:getVar('--grid') } }
+      }
+    };
+
+    const chart = new Chart($('chart').getContext('2d'), {
+      type:'line',
+      data:{ labels:[], datasets:[
+        {label:'Potřebná budoucí částka (nominálně)', data:[], borderColor:getVar('--brand'), pointBackgroundColor:getVar('--brand'), borderWidth:2, tension:.2},
+        {label:'Reálná hodnota dnešní částky', data:[], borderColor:getVar('--accent'), pointBackgroundColor:getVar('--accent'), borderWidth:2, tension:.2}
+      ]},
+      options: baseOptions
+    });
+
+    /* ===== stránka ===== */
+    const els = {
+      amount: $('amount'), infl: $('infl'), years: $('years'),
+      form: $('calcForm'), reset: $('resetBtn'),
+      kpiYears: $('kpiYears'), kpiReal: $('kpiReal'), kpiNeeded: $('kpiNeeded'), kpiCum: $('kpiCum')
+    };
+
+    // univerzální „klikni-a-přepiš“
+    function enableSelectAll(el){
+      el.addEventListener('focus', ()=>{ el.select(); el.dataset.selAll='1'; });
+      el.addEventListener('mouseup', (e)=>{ if (el.dataset.selAll){ e.preventDefault(); delete el.dataset.selAll; } });
+    }
+    [els.amount, els.years].forEach(enableSelectAll);
+
+    // sazba – select-all + komfortní psaní + krokování
+    enableSelectAll(els.infl);
+    const clampPct = (v)=> Math.max(-100, Math.min(100, v));
+    const getInfl = ()=> parseNum(els.infl.value);
+    const setInfl = (v)=>{ els.infl.value = (Number(v)||0).toFixed(2).replace('.',','); };
+    const stepInfl = (d)=>{ setInfl(clampPct(getInfl()+d)); update(); };
+
+    function update(opts={ formatRate:true }){
+      // formátování (sazbu jen někdy, aby se kurzor neposouval během psaní)
+      formatInput(els.amount,0);
+      if (opts.formatRate) formatInput(els.infl,2);
+      formatInput(els.years,0);
+
+      const amount = parseNum(els.amount.value);
+      const infl   = parseNum(els.infl.value);
+      const years  = Math.max(0, parseNum(els.years.value));
+
+      // deep-link
+      writeParams({ amount, infl, years });
+
+      const { labels, needed, real, factor } = seriesInflation(amount, infl, years);
+
+      chart.data.labels = labels;
+      chart.data.datasets[0].data = needed;
+      chart.data.datasets[1].data = real;
+      chart.update('none');
+
+      // KPI
+      els.kpiYears.textContent = Intl.NumberFormat('cs-CZ').format(years);
+      const realEnd = real[real.length-1] ?? 0;
+      const needEnd = needed[needed.length-1] ?? 0;
+      els.kpiReal.textContent   = fmtCZK0.format(realEnd);
+      els.kpiNeeded.textContent = fmtCZK0.format(needEnd);
+      const cumPct = (factor-1)*100;
+      els.kpiCum.textContent    = `${cumPct.toFixed(1).replace('.',',')} %`;
+    }
+
+    const live = debounce(update, 80);
+
+    // init z URL
+    (function initFromURL(){
+      const p = readParams({ amount:500000, infl:3, years:10 });
+      els.amount.value = p.amount.toLocaleString('cs-CZ');
+      els.infl.value   = p.infl.toFixed(2).replace('.',',');
+      els.years.value  = p.years.toLocaleString('cs-CZ');
+    })();
+
+    // handlery
+    els.form.addEventListener('submit', e=>{ e.preventDefault(); update(); });
+
+    // běžná pole: live přepočet
+    ['input','change'].forEach(evt=>{
+      [els.amount, els.years].forEach(el=> el.addEventListener(evt, live, {passive:true}));
+    });
+
+    // sazba: během psaní neformátovat; doformátovat na blur; krokování šipkami a kolečkem
+    els.infl.addEventListener('input', ()=>{ update({ formatRate:false }); });
+    els.infl.addEventListener('blur',  ()=>{ setInfl(getInfl()); update(); });
+    els.infl.addEventListener('keydown', (e)=>{
+      if (e.key === 'ArrowUp')   { e.preventDefault(); stepInfl(e.shiftKey ? 1 : 0.25); }
+      if (e.key === 'ArrowDown') { e.preventDefault(); stepInfl(e.shiftKey ? -1 : -0.25); }
+    });
+    els.infl.addEventListener('wheel', (e)=>{
+      if (document.activeElement === els.infl){
+        e.preventDefault();
+        stepInfl(e.deltaY < 0 ? (e.shiftKey ? 1 : 0.25) : (e.shiftKey ? -1 : -0.25));
+      }
+    }, { passive:false });
+
+    // reset
+    els.reset.addEventListener('click', ()=>{
+      els.amount.value='500 000'; els.infl.value='3,00'; els.years.value='10'; update();
+    });
+
+    // první vykreslení
+    update();
+  </script>
+</body>
+</html>
