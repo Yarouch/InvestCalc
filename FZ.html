@@ -1,0 +1,694 @@
+Tady je celý upravený kód HTML s CSS a JavaScriptem, kde jsou tři samostatné sekce: VSTUPY (formulář), GRAF a SOUHRN A VÝSLEDKY (budoucí hodnota a detaily). Vše je přeuspořádáno podle tvého požadavku:
+
+```html
+<!doctype html>
+<html lang="cs">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="format-detection" content="telephone=no">
+  <title>Model budoucí hodnoty – DPS, DIP a Investiční portfolio</title>
+  <style>
+    :root{
+      --bg: linear-gradient(180deg, #080A0E 0%, #0B0C10 40%, #0E1014 100%);
+      --panel:#12141a; --muted:#9aa3b2; --text:#e6e9ef; --brand:#4f8cff;
+      --principal:#4f6dff; --interest:#00cc66; --grid: rgba(255,255,255,.08);
+      --radius:14px; --ring:0 0 0 3px rgba(79,140,255,.25);
+      color-scheme: light dark;
+    }
+    @media (prefers-color-scheme: light){
+      :root{ --bg: linear-gradient(180deg,#fff 0%,#f6f8fb 60%,#eef3f9 100%);
+        --panel:#fff; --muted:#667085; --text:#0b0c10; --brand:#375dfb; --grid: rgba(0,0,0,.08); }
+    }
+    *{box-sizing:border-box}
+    html{ -webkit-text-size-adjust: 100%; }
+    body{ margin:0; font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Arial;
+      color:var(--text); background:var(--bg); min-height:100svh; padding-bottom:env(safe-area-inset-bottom);}
+    .topnav{ position:sticky; top:0; z-index:100; background:rgba(18,20,26,.8);
+      border-bottom:1px solid rgba(255,255,255,.06); padding-top:max(10px,env(safe-area-inset-top)); backdrop-filter:blur(6px) }
+    .topnav .inner{max-width:1100px; margin:0 auto; padding:10px 20px; display:flex; gap:12px; align-items:center; overflow:auto}
+    .topnav a{display:inline-block; padding:10px 12px; border-radius:12px; text-decoration:none; color:#fff; border:1px solid transparent; font-weight:600; white-space:nowrap}
+    .topnav a.active{ background:linear-gradient(135deg,var(--brand),#6aa8ff); color:#fff; box-shadow:0 8px 20px rgba(79,140,255,.35) }
+    @media (prefers-color-scheme: light){
+      .topnav{ background:rgba(255,255,255,.75); border-bottom:1px solid rgba(0,0,0,.06) }
+      .topnav a{ color:#0b0c10 }
+    }
+
+    .wrap{ max-width:1100px; margin:min(6vh,48px) auto; padding:20px; padding-left:max(20px,env(safe-area-inset-left)); padding-right:max(20px,env(safe-area-inset-right)); }
+    .stack{ display:grid; gap:18px; align-items:start }
+
+    .card{ border:1px solid rgba(255,255,255,.08); border-radius:var(--radius); background:linear-gradient(180deg,rgba(255,255,255,.02),rgba(255,255,255,0)); box-shadow:0 10px 30px rgba(0,0,0,.35) }
+    .card .head{ padding:12px 14px 8px; border-bottom:1px solid rgba(255,255,255,.06) }
+    @media (prefers-color-scheme: light){ .card .head{border-bottom-color:rgba(0,0,0,.06)} }
+    .card .body{ padding:12px 14px }
+
+    /* Sticky akce ve formuláři */
+    .form-actions-sticky{
+      position: sticky; top: calc(56px + env(safe-area-inset-top));
+      background: var(--panel); z-index: 5; padding: 6px 0; border-bottom:1px solid rgba(255,255,255,.06);
+    }
+
+    /* Inputs – kompaktní + mikro popisky + suffixy */
+    .input{ display:flex; flex-direction:column; gap:6px; padding:8px 10px; border-radius:12px; border:1px solid rgba(255,255,255,.10); background:rgba(0,0,0,.10) }
+    .input:focus-within{ box-shadow:var(--ring); border-color:rgba(79,140,255,.3) }
+    .input.suffix{ position: relative; }
+    .input.suffix input{ padding-right:56px; }
+    .input .suf{
+      position:absolute; right:10px; top:50%; transform:translateY(-50%);
+      font-size:12px; color:var(--muted); pointer-events:none;
+    }
+    input{
+      appearance:none; border:0; outline:0; background:transparent; width:100%; color:var(--text); font:inherit;
+      font-size:16px; /* iOS zoom fix */
+    }
+    input::placeholder{ color:rgba(255,255,255,.55) } @media (prefers-color-scheme: light){ input::placeholder{ color:rgba(0,0,0,.45)} }
+
+    .btn{ border-radius:12px; border:1px solid rgba(255,255,255,.12); background:linear-gradient(135deg,var(--brand),#6aa8ff); color:#fff; padding:10px 14px; cursor:pointer; font-weight:700; min-height:44px }
+    .btn.ghost{ background:transparent; color:var(--text); border:1px dashed rgba(255,255,255,.25) }
+    .btn.secondary{ background:rgba(255,255,255,.06); color:var(--text) }
+    :where(a, button, select, input):focus-visible{ outline:none; box-shadow:var(--ring) }
+
+    .rows{ display:grid; gap:8px }
+
+    /* pevné štítky názvů + kompaktní grid */
+    .prod{ display:grid; grid-template-columns: 1.25fr 1fr 1fr 1fr auto; gap:8px; align-items:start }
+    .prod.dps{ grid-template-columns: 1.25fr 1fr 1fr 1fr 1fr; } /* bez delete tlačítka */
+    .prod.dip{ grid-template-columns: 1.25fr 1fr 1fr 1fr; }    /* bez delete tlačítka */
+    .prod .pname{
+      display:flex; align-items:center; gap:8px; padding:8px 10px; border-radius:12px;
+      border:1px solid rgba(255,255,255,.10); background:rgba(255,255,255,.04); font-weight:700;
+    }
+    .pbadge{ font-size:12px; color:var(--muted); margin-left:auto }
+
+    .meta{ grid-column: 1 / -1; display:flex; gap:8px; flex-wrap:wrap; color:var(--muted); font-size:12px; align-items:center }
+    .tag{ border:1px solid rgba(255,255,255,.12); border-radius:999px; padding:2px 8px }
+
+    /* Hint & error */
+    .input.error{ border-color:#ff5c5c; box-shadow:0 0 0 3px rgba(255,92,92,.2); }
+    .input .hint-err{ color:#ff8a8a; font-size:12px; }
+
+    /* Horizont – stepper */
+    .inline-controls{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+    .stepper{
+      display:flex; align-items:center; gap:6px; padding:6px; border-radius:12px;
+      border:1px solid rgba(255,255,255,.12); background:rgba(255,255,255,.04)
+    }
+    .stepper .btn-step{
+      display:inline-flex; align-items:center; justify-content:center;
+      width:36px; height:36px; border-radius:10px; border:1px solid rgba(255,255,255,.18);
+      background:rgba(255,255,255,.06); color:var(--text); cursor:pointer; font-weight:900;
+    }
+    .stepper .btn-step:disabled{ opacity:.5; cursor:not-allowed }
+    .stepper input{ max-width:90px; text-align:center; padding:6px 8px; border-radius:10px; border:1px solid rgba(255,255,255,.14); background:rgba(0,0,0,.16) }
+
+    .kpis{ display:grid; grid-template-columns: repeat(3,1fr); gap:10px }
+    @media (max-width:640px){ .kpis{ grid-template-columns:1fr } }
+    .kpi{ padding:10px; border-radius:12px; border:1px solid rgba(255,255,255,.08); background:linear-gradient(180deg,rgba(255,255,255,.02),rgba(255,255,255,0)); display:grid; gap:4px }
+    .kpi .title{ color:var(--muted); font-size:12px; letter-spacing:.2px; text-transform:uppercase; display:flex; align-items:center; gap:8px }
+    .kpi .value{ font-weight:900; font-size:clamp(18px,3.5vw,26px) }
+
+    .legend{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; color:var(--muted) }
+    .chart-inner{ position:relative; aspect-ratio: 16 / 9; width:100%; max-height:70vh }
+    .y-labels{ position:absolute; inset:0 0 0 0; pointer-events:none; font-size:12px; color:var(--muted) }
+
+    table{ width:100%; border-collapse:collapse; margin-top:10px; }
+    th,td{ padding:8px 6px; border-bottom:1px solid rgba(255,255,255,.08); text-align:right }
+    th:first-child, td:first-child{ text-align:left }
+    .table-wrap{ overflow:auto; }
+    /* Sticky první sloupec pro lepší čitelnost */
+    table th:first-child, table td:first-child{
+      position: sticky; left: 0; background: var(--panel); z-index: 1;
+    }
+    .table-title{ margin-top:10px; color:var(--muted); font-weight:700; text-transform:uppercase; font-size:12px; letter-spacing:.2px }
+
+    .actions{ display:flex; gap:8px; flex-wrap:wrap; margin-top:6px }
+    .rowbtn{ border-radius:10px; border:1px solid rgba(255,255,255,.18); background:rgba(255,255,255,.06); color:var(--text); padding:8px 10px; cursor:pointer; min-height:40px }
+
+    .progress{height:8px;border-radius:999px;background:rgba(255,255,255,.08);overflow:hidden}
+    .progress > i{display:block;height:100%;background:linear-gradient(90deg,#4f8cff,#6aa8ff)}
+
+    @media (prefers-reduced-motion: reduce){
+      *{ transition:none !important; animation:none !important; }
+    }
+  </style>
+</head>
+<body>
+  <nav class="topnav">
+    <div class="inner">
+      <a class="active" href="index.html" id="nav-uroceni">Složené úročení (DPS/DIP/Portfolio)</a>
+      <a href="renta.html" id="nav-renta">Finanční nezávislost</a>
+      <a href="kouzlo.html" id="nav-kouzlo">Kouzlo složeného úročení</a>
+      <a href="hypoinv.html" id="nav-hypo">Hypotéka vs. investice</a>
+      <a href="inflace.html" id="nav-inflace">Kalkulačka inflace</a>
+    </div>
+  </nav>
+
+  <div class="wrap">
+    <header>
+      <h1>Model budoucí hodnoty – DPS, DIP a Investiční portfolio</h1>
+      <p class="lead">Úložka se počítá <strong>na konci každého měsíce</strong>. DPS/DIP: státní příspěvek a daňový odpočet dle pravidel pro rok 2025 (daňovou úsporu pouze zobrazujeme).</p>
+    </header>
+
+    <!-- VSTUPY -->
+    <section class="card" aria-labelledby="formHeading">
+      <div class="head"><h2 id="formHeading">Vstupy</h2></div>
+      <div class="body">
+        <form id="calcForm" autocomplete="off">
+          <div class="form-actions-sticky">
+            <div class="inline-controls">
+              <div class="stepper" role="group" aria-label="Investiční horizont v letech">
+                <span class="micro" style="margin-right:6px">⏳ Horizont</span>
+                <button type="button" class="btn-step" id="yearsMinus" aria-label="Zkrátit horizont o 1 rok">−</button>
+                <input id="years" type="text" inputmode="numeric" value="20" aria-label="Počet let" />
+                <button type="button" class="btn-step" id="yearsPlus" aria-label="Prodloužit horizont o 1 rok">+</button>
+                <span class="micro">let</span>
+              </div>
+
+              <button id="addRow" type="button" class="btn ghost">+ Přidat produkt</button>
+              <button class="btn" type="submit">Přepočítat</button>
+              <button id="resetBtn" class="btn secondary" type="button">Vyčistit</button>
+            </div>
+          </div>
+
+          <div class="rows" id="rows"></div>
+
+          <p class="micro" style="margin-top:6px">
+            DPS: státní příspěvek dle vlastní měsíční úložky (≥500 Kč → až 340 Kč/měs. při 1 700 Kč+). Daňový odpočet z částky nad 1 700 Kč/měs.  
+            DIP: bez státního příspěvku; daňový odpočet do <strong>společného limitu 48 000 Kč/rok</strong> (DPS+DIP). Daňová úspora je pouze informační a do FV se nezahrnuje.
+          </p>
+        </form>
+      </div>
+    </section>
+
+    <!-- GRAF -->
+    <section class="card" aria-labelledby="chartHeading">
+      <div class="head">
+        <h2 id="chartHeading">Vývoj portfolia v čase</h2>
+        <div class="legend">
+          <span class="dot principal" style="width:12px;height:12px;border-radius:3px;background:var(--principal)"></span> vklady (tvoje peníze)
+          <span class="dot interest" style="width:12px;height:12px;border-radius:3px;background:var(--interest)"></span> zhodnocení
+        </div>
+      </div>
+
+      <div class="body chart">
+        <div class="chart-inner" id="chartInner" style="padding-bottom:40px">
+          <canvas id="barChart"></canvas>
+          <div class="y-labels" id="yLabels"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SOUHRN A VÝSLEDKY -->
+    <section class="card" aria-labelledby="resultsHeading">
+      <div class="head"><h2 id="resultsHeading">Souhrn a výsledky</h2></div>
+      <div class="body">
+        <div class="kpis" id="results" hidden aria-live="polite" aria-atomic="true" style="margin-top:12px; padding-top:16px; border-top:1px solid var(--grid); position:relative; z-index:2">
+          <div class="kpi">
+            <div class="title"><span aria-hidden="true">💰</span> Budoucí hodnota (FV)</div>
+            <div class="value" id="fv">–</div>
+          </div>
+          <div class="kpi">
+            <div class="title"><span aria-hidden="true">📥</span> Celkem vloženo (tvoje peníze)</div>
+            <div class="value" id="deposits">–</div>
+          </div>
+          <div class="kpi">
+            <div class="title"><span aria-hidden="true">📈</span> Zhodnocení</div>
+            <div class="value" id="interest">–</div>
+          </div>
+        </div>
+
+        <div class="table-title">Detail podle produktů</div>
+        <div class="table-wrap">
+          <table id="perTable" aria-label="Přehled podle produktů" style="min-width:640px">
+            <thead>
+              <tr>
+                <th>Produkt</th>
+                <th>Jednorázově</th>
+                <th>Měsíčně</th>
+                <th>Ročně (%)</th>
+                <th>FV za <span id="thYears">–</span> let</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    /* ===== utils ===== */
+    const fmtCZK0 = new Intl.NumberFormat('cs-CZ', { style:'currency', currency:'CZK', maximumFractionDigits:0 });
+    const fmtPct2 = new Intl.NumberFormat('cs-CZ', { minimumFractionDigits:2, maximumFractionDigits:2 });
+    const $ = (id)=>document.getElementById(id);
+    const debounce=(fn,ms)=>{let t;return(...a)=>{clearTimeout(t);t=setTimeout(()=>fn(...a),ms)}};
+
+    function parseNum(v){ if (typeof v!=='string') return Number(v)||0; return Number(v.replace(/\s+/g,'').replace(/\.(?=\d{3}(\D|$))/g,'').replace(',', '.'))||0; }
+    function formatInput(el, dec=0){
+      el.value=String(el.value??'').replace(/\s+/g,'').replace(',', '.');
+      const n=Number(el.value)||0;
+      el.value=(dec?n.toFixed(dec):Math.round(n).toString()).replace('.',',').replace(/\B(?=(\d{3})+(?!\d))/g,' ');
+    }
+    function shortCZK(n){ const a=Math.abs(n); if(a>=1e9)return(n/1e9).toFixed(2).replace('.',',')+' mld.'; if(a>=1e6)return(n/1e6).toFixed(2).replace('.',',')+' mil.'; if(a>=1e3)return(n/1e3).toFixed(1).replace('.',',')+' tis.'; return fmtCZK0.format(n);}
+
+    function enableSelectAll(el){
+      el.addEventListener('focus', () => { el.select(); el.dataset.selAll = '1'; }, {passive:true});
+      el.addEventListener('mouseup', (e) => { if (el.dataset.selAll) { e.preventDefault(); delete el.dataset.selAll; } }, {passive:false});
+      el.addEventListener('touchend', (e) => { if (el.dataset.selAll) { e.preventDefault(); delete el.dataset.selAll; } }, {passive:false});
+    }
+
+    /* ===== DPS & DIP pravidla (2025) ===== */
+    const TAX_RATE = 0.15;
+    const DEDUCTION_CAP = 48000;
+
+    function dpsStateMonthly(userMonthly){
+      const m = Math.max(0, userMonthly);
+      if (m < 500) return 0;
+      if (m >= 1700) return 340;
+      const ratio = (m - 500) / (1700 - 500);
+      return Math.round(ratio * 340);
+    }
+    function annualDeductionEligible(dpsUserMonthly, dipUserMonthly){
+      const dpsEligible = Math.max(0, dpsUserMonthly - 1700) * 12;
+      const dipEligible = Math.max(0, dipUserMonthly) * 12;
+      return { dpsEligible, dipEligible, totalEligible: dpsEligible + dipEligible };
+    }
+    function splitDeductionCap(dpsEligible, dipEligible){
+      const total = dpsEligible + dipEligible;
+      if (total <= 0) return { dpsAllowed:0, dipAllowed:0 };
+      const scale = Math.min(1, DEDUCTION_CAP / total);
+      return { dpsAllowed: dpsEligible * scale, dipAllowed: dipEligible * scale };
+    }
+
+    /* ===== výpočty ===== */
+    function simulatePortfolio(products, years){
+      const months = Math.max(0, Math.round((Number(years)||0) * 12));
+      const annualTotal=[], annualDeposits=[];
+      const bal = products.map(p => Number(p.lump)||0);
+      let ownDeposited = products.reduce((s,p)=>s+Number(p.lump||0), 0);
+      const rMonthly = products.map(p => (Number(p.rate)||0)/100/12);
+      for(let m=1;m<=months;m++){
+        for(let i=0;i<products.length;i++){
+          bal[i] *= (1 + rMonthly[i]);
+          bal[i] += products[i].pmtForFV;
+        }
+        ownDeposited += products.reduce((s,p)=> s + (p.ownMonthly||0), 0);
+        if(m%12===0){
+          const total = bal.reduce((s,x)=>s+x,0);
+          annualTotal.push(total);
+          annualDeposits.push(ownDeposited);
+        }
+      }
+      const fv = bal.reduce((s,x)=>s+x,0);
+      return { fv, annualTotal, annualDeposits, ownDeposited };
+    }
+
+    /* ===== graf ===== */
+    function cssVar(name, fallback){ const v=getComputedStyle(document.documentElement).getPropertyValue(name).trim(); return v||fallback; }
+    function drawBarsAnnual(canvas, container, annualTotal, annualDeposits){
+      const ctx=canvas.getContext('2d'), dpr=window.devicePixelRatio||1, pad=28;
+      const W=container.clientWidth||600, H=Math.max(220, Math.round(W*0.6));
+      canvas.width=W*dpr; canvas.height=H*dpr; canvas.style.width=W+'px'; canvas.style.height=H+'px'; ctx.setTransform(dpr,0,0,dpr,0,0);
+      ctx.clearRect(0,0,W,H);
+      const n=annualTotal.length; if(!n) return;
+      const maxVal=Math.max(...annualTotal,1);
+      const left=pad*2, right=pad, top=pad, bottom=pad*2.2;
+      const chartW=W-left-right, chartH=H-top-bottom;
+
+      // grid
+      ctx.strokeStyle=cssVar('--grid','rgba(255,255,255,.08)'); ctx.lineWidth=1;
+      const lines=6;
+      for(let i=0;i<=lines;i++){ const y=top+(chartH*i/lines); ctx.beginPath(); ctx.moveTo(left,y); ctx.lineTo(left+chartW,y); ctx.stroke(); }
+
+      const gap=Math.max(4, chartW/(n*6)); const barW=Math.max(8,(chartW-gap*(n+1))/n); const zeroY=top+chartH;
+      const colP=cssVar('--principal','#4f6dff'); const colI=cssVar('--interest','#00cc66');
+
+      const rects=[];
+      for(let i=0;i<n;i++){
+        const total=annualTotal[i], depo=annualDeposits[i];
+        const hTotal=(total/maxVal)*chartH; const hDepo=(depo/maxVal)*chartH;
+        const x=left+gap+i*(barW+gap);
+        ctx.fillStyle=colP; ctx.fillRect(x, zeroY-hDepo, barW, hDepo);
+        ctx.fillStyle=colI; ctx.fillRect(x, zeroY-hTotal, barW, hTotal-hDepo);
+        ctx.strokeStyle = 'rgba(0,0,0,.15)'; ctx.strokeRect(x, zeroY-hDepo, barW, hDepo); ctx.strokeRect(x, zeroY-hTotal, barW, hTotal-hDepo);
+        rects.push({x, y:zeroY-hTotal, w:barW, h:hTotal, i});
+      }
+
+      // y-labels
+      const yLabels=document.getElementById('yLabels');
+      if (yLabels){
+        const labels=Array.from({length:lines+1},(_,i)=> shortCZK(Math.round(maxVal*i/lines)));
+        yLabels.innerHTML = labels.map((t,i)=>`<div style="position:absolute;left:4px;top:${top + (chartH*i/lines) - 8}px">${t}</div>`).join('');
+      }
+
+      // tooltip
+      const tt = container.querySelector('.chart-tooltip') || (()=>{const d=document.createElement('div'); d.className='chart-tooltip'; Object.assign(d.style,{position:'absolute',pointerEvents:'none',padding:'6px 8px',font:'12px system-ui',borderRadius:'8px',background:'rgba(0,0,0,.75)',color:'#fff',transform:'translate(-50%,-110%)',whiteSpace:'nowrap',zIndex:'2',display:'none'}); container.appendChild(d); return d;})();
+      const onMove=(ev)=>{
+        const bb=canvas.getBoundingClientRect();
+        const x=(ev.clientX??ev.touches?.[0]?.clientX)-bb.left;
+        const y=(ev.clientY??ev.touches?.[0]?.clientY)-bb.top;
+        let hit=null; for(const r of rects){ if(x>=r.x && x<=r.x+r.w && y>=r.y && y<=r.y+r.h){hit=r;break;} }
+        if(!hit){ tt.style.display='none'; return; }
+        const i=hit.i, year=i+1, total=annualTotal[i], depo=annualDeposits[i], intr=total-depo;
+        tt.innerHTML=`Rok ${year}<br>Vklady: <b>${shortCZK(depo)}</b><br>Zhodnocení: <b>${shortCZK(intr)}</b><br>Hodnota: <b>${shortCZK(total)}</b>`;
+        tt.style.left=(hit.x+hit.w/2)+'px'; tt.style.top=(hit.y)+'px'; tt.style.display='block';
+      };
+      container.onpointermove=onMove; container.onpointerleave=()=>{tt.style.display='none';};
+    }
+
+    /* ===== DOM ===== */
+    const els = {
+      years: $('years'), yearsMinus: $('yearsMinus'), yearsPlus: $('yearsPlus'),
+      rows: $('rows'),
+      addRow: $('addRow'),
+      form: $('calcForm'),
+      reset: $('resetBtn'),
+      chartInner: $('chartInner'), barChart: $('barChart'),
+      results: $('results'), fv: $('fv'), deposits: $('deposits'), interest: $('interest'),
+      perTable: document.querySelector('#perTable tbody'),
+      note: $('note'), thYears: $('thYears'),
+      yLabels: $('yLabels'),
+    };
+
+    /* ===== řádky ===== */
+    let portfolioCounter = 0;
+    let lastAnnualTotal = []; let lastAnnualDeposits = [];
+    let chartVisible = true;
+
+    function prodRowTemplate(kind='PORT', defaults={}){
+      const wrap = document.createElement('div');
+      if (kind==='DPS') wrap.className = 'prod dps';
+      else if (kind==='DIP') wrap.className = 'prod dip';
+      else wrap.className = 'prod';
+
+      const name = (kind==='DPS') ? 'DPS' : (kind==='DIP' ? 'DIP' : (defaults.fixedName || nextPortfolioName()));
+      wrap.dataset.kind = kind;
+      wrap.dataset.name = name;
+
+      const monthly = defaults.monthly ?? '';
+      const lump = defaults.lump ?? '';
+      const rate = defaults.rate ?? '';
+      const employer = defaults.employer ?? '';
+
+      // pevný název vlevo
+      const nameCell = `<div class="pname">${name} ${kind==='PORT' ? `<span class="pbadge">Investiční portfolio</span>` : ''}${kind!=='PORT' ? `<span class="pbadge"></span>` : ''}</div>`;
+      const inputMonthly = `
+        <div class="input suffix">
+          <div class="micro">Měsíční úložka</div>
+          <input data-f="monthly" type="text" placeholder="např. 5 000" value="${monthly}">
+          <span class="suf">Kč/měs.</span>
+        </div>`;
+      const inputLump = `
+        <div class="input suffix">
+          <div class="micro">Jednorázově</div>
+          <input data-f="lump" type="text" placeholder="např. 100 000" value="${lump}">
+          <span class="suf">Kč</span>
+        </div>`;
+      const inputRate = `
+        <div class="input suffix">
+          <div class="micro">Roční zhodnocení</div>
+          <input data-f="rate" type="text" placeholder="např. 6,0" value="${rate}">
+          <span class="suf">% p.a.</span>
+        </div>`;
+
+      if(kind==='DPS'){
+        const inputEmployer = `
+          <div class="input suffix">
+            <div class="micro">Příspěvek zaměstnavatele</div>
+            <input data-f="employer" type="text" placeholder="např. 1 000" value="${employer}">
+            <span class="suf">Kč/měs.</span>
+          </div>`;
+        wrap.innerHTML = `${nameCell}${inputMonthly}${inputLump}${inputRate}${inputEmployer}
+          <div class="meta">
+            <span class="tag dps-state">Státní příspěvek: – / měs.</span>
+            <span class="tag dps-tax">Roční daňová úspora (zobrazení): –</span>
+            <span class="tag">Využití limitu 48 000: <b><span id="ded-used">–</span></b></span>
+            <div class="progress" style="flex:1;min-width:140px"><i id="ded-bar" style="width:0%"></i></div>
+          </div>`;
+      } else if(kind==='DIP'){
+        wrap.innerHTML = `${nameCell}${inputMonthly}${inputLump}${inputRate}
+          <div class="meta">
+            <span class="tag dip-tax">Roční daňová úspora (zobrazení): –</span>
+          </div>`;
+      } else {
+        // PORT – smazatelný
+        wrap.innerHTML = `${nameCell}${inputMonthly}${inputLump}${inputRate}
+          <button type="button" class="rowbtn del" aria-label="Smazat produkt">✕</button>`;
+      }
+
+      // Handlery + validace sazby
+      wrap.querySelectorAll('input').forEach(inp=>{
+        enableSelectAll(inp);
+        inp.addEventListener('input', ()=> updateDebounced(), {passive:true});
+        inp.addEventListener('blur', ()=> update(), {passive:true});
+      });
+      const del = wrap.querySelector('.del');
+      if (del) del.addEventListener('click', ()=>{ wrap.remove(); renumberPortfolios(); update(); }, {passive:true});
+
+      // okamžitě validuj sazbu u nového řádku
+      validateRateInput(wrap.querySelector('input[data-f="rate"]'));
+
+      return wrap;
+    }
+
+    function nextPortfolioName(){ portfolioCounter += 1; return `Investiční portfolio ${portfolioCounter}`; }
+    function renumberPortfolios(){
+      portfolioCounter = 0;
+      document.querySelectorAll('.prod').forEach(row=>{
+        if (row.dataset.kind==='PORT'){
+          portfolioCounter += 1;
+          const newName = `Investiční portfolio ${portfolioCounter}`;
+          row.dataset.name = newName;
+          const nameEl = row.querySelector('.pname');
+          if (nameEl) nameEl.firstChild.nodeValue = newName + ' ';
+        }
+      });
+    }
+
+    function addRow(d={}){ els.rows.appendChild(prodRowTemplate(d.kind||'PORT', d)); }
+
+    // LocalStorage
+    const LS_KEY = 'yarouch-portfolio-v4';
+    function saveState(){
+      const years = parseNum(els.years.value);
+      const prods = readProducts().map(({kind,name,monthly,lump,rate,employer})=>({kind,name,monthly,lump,rate,employer}));
+      localStorage.setItem(LS_KEY, JSON.stringify({years, prods}));
+    }
+    function loadState(){
+      try{
+        const s = JSON.parse(localStorage.getItem(LS_KEY)||'null'); if(!s) return false;
+        els.years.value = s.years ?? '20';
+        els.rows.innerHTML=''; portfolioCounter=0;
+        // DPS + DIP pevně
+        const dps = (s.prods||[]).find(p=>p.kind==='DPS') || { monthly:'1700', lump:'0', rate:'5,00', employer:'0' };
+        const dip = (s.prods||[]).find(p=>p.kind==='DIP') || { monthly:'2300', lump:'0', rate:'5,00' };
+        els.rows.appendChild(prodRowTemplate('DPS', dps));
+        els.rows.appendChild(prodRowTemplate('DIP', dip));
+        (s.prods||[]).filter(p=>p.kind==='PORT').forEach(p=>{
+          portfolioCounter += 1;
+          addRow({kind:'PORT', fixedName: p.name || nextPortfolioName(), ...p});
+        });
+        return true;
+      }catch(e){ return false; }
+    }
+
+    // Předvyplněné 3 produkty (když není uložený stav)
+    function initDefaults(){
+      els.rows.appendChild(prodRowTemplate('DPS', { monthly:'1 700', lump:'0', rate:'5,00', employer:'0' }));
+      els.rows.appendChild(prodRowTemplate('DIP', { monthly:'2 300', lump:'0', rate:'5,00' }));
+      addRow({ kind:'PORT', fixedName: nextPortfolioName(), monthly:'10 000', lump:'150 000', rate:'6,00' });
+    }
+
+    /* ===== načtení vstupů ===== */
+    function readProducts(){
+      const prods=[];
+      els.rows.querySelectorAll('.prod').forEach(row=>{
+        const kind=row.dataset.kind;
+        const name=row.dataset.name;
+        const get=(f)=> parseNum(row.querySelector(`input[data-f="${f}"]`)?.value || 0);
+        const monthly=get('monthly'), lump=get('lump'), rate=get('rate'), employer=get('employer');
+        prods.push({ kind, el:row, name, monthly, lump, rate, employer: employer||0 });
+      });
+      return prods;
+    }
+
+    /* ===== validace sazby ===== */
+    function validateRateInput(input){
+      if(!input) return;
+      const r = parseNum(input.value);
+      const box = input.closest('.input');
+      if(!box) return;
+      const prev = box.querySelector('.hint-err'); if(prev) prev.remove();
+      const invalid = (r<0 || r>20);
+      box.classList.toggle('error', invalid);
+      if(invalid){ box.insertAdjacentHTML('beforeend','<div class="hint-err">Doporučený rozsah 0–20 %</div>'); }
+    }
+
+    /* ===== hlavní výpočet & render ===== */
+    const updateDebounced = debounce(()=>update(), 150);
+
+    function update(opts={ formatRate:true }){
+      // formát vstupů
+      formatInput(els.years,0);
+      document.querySelectorAll('input[data-f]').forEach(inp=>{
+        const f = inp.dataset.f;
+        if (f==='rate' && !opts.formatRate) return;
+        formatInput(inp, f==='rate' ? 2 : 0);
+        if(f==='rate') validateRateInput(inp);
+      });
+
+      // validace horizontu + disable stepper
+      let years = Math.max(1, Math.min(60, parseNum(els.years.value)));
+      els.years.value = String(years);
+      els.yearsMinus.disabled = years<=1; els.yearsPlus.disabled = years>=60;
+
+      const raw = readProducts();
+
+      // DPS/DIP – daňové nároky
+      const dps = raw.find(p=>p.kind==='DPS'); const dip = raw.find(p=>p.kind==='DIP');
+      const dpsUserMonthly = dps ? Math.max(0,dps.monthly) : 0;
+      const dipUserMonthly = dip ? Math.max(0,dip.monthly) : 0;
+
+      const { dpsEligible, dipEligible } = annualDeductionEligible(dpsUserMonthly, dipUserMonthly);
+      const { dpsAllowed, dipAllowed } = splitDeductionCap(dpsEligible, dipEligible);
+      const dpsTaxSaving = dpsAllowed * TAX_RATE;
+      const dipTaxSaving = dipAllowed * TAX_RATE;
+
+      // Map pro simulaci (FV vstup = vlastní vklad + stát/zaměstnav. u DPS)
+      const productsForSim = raw.map(p=>{
+        let pmtForFV = p.monthly; // default
+        let ownMonthly = p.monthly;
+        let extra = {};
+        if (p.kind==='DPS'){
+          const state = dpsStateMonthly(p.monthly);
+          pmtForFV = p.monthly + p.employer + state;
+          extra.dpsStateMonthly = state;
+          extra.taxSavingAnnual = dpsTaxSaving;
+        } else if (p.kind==='DIP'){
+          extra.taxSavingAnnual = dipTaxSaving;
+        }
+        return { name:p.name, kind:p.kind, lump:p.lump, rate:p.rate, pmtForFV, ownMonthly, extra, el:p.el };
+      });
+
+      // Simulace portfolia
+      const { fv, annualTotal, annualDeposits, ownDeposited } = simulatePortfolio(productsForSim, years);
+      lastAnnualTotal = annualTotal; lastAnnualDeposits = annualDeposits;
+
+      // Per produkt
+      const perResults = productsForSim.map(p=>{
+        const single = simulatePortfolio([p], years);
+        return { name:p.name, kind:p.kind, fv: single.fv, lump:p.lump, monthly:p.ownMonthly, rate:p.rate, extra:p.extra, el:p.el };
+      });
+
+      // KPI
+      els.thYears.textContent = years;
+      els.fv.textContent = fmtCZK0.format(fv);
+      els.deposits.textContent = fmtCZK0.format(ownDeposited);
+      els.interest.textContent = fmtCZK0.format(Math.max(0, fv - ownDeposited));
+      els.results.hidden = false;
+
+      // Štítky u DPS/DIP + progress limitu
+      perResults.forEach(p=>{
+        if (p.kind==='DPS'){
+          const st = p.el.querySelector('.dps-state'); if (st) st.textContent = `Státní příspěvek: ${fmtCZK0.format(p.extra.dpsStateMonthly)} / měs.`;
+          const tt = p.el.querySelector('.dps-tax');   if (tt) tt.textContent = `Roční daňová úspora (zobrazení): ${fmtCZK0.format(dpsTaxSaving||0)}`;
+        } else if (p.kind==='DIP'){
+          const tt = p.el.querySelector('.dip-tax');   if (tt) tt.textContent = `Roční daňová úspora (zobrazení): ${fmtCZK0.format(dipTaxSaving||0)}`;
+        }
+      });
+      const used = Math.min(48000, dpsAllowed + dipAllowed);
+      const usedEl = document.getElementById('ded-used');
+      const barEl  = document.getElementById('ded-bar');
+      if (usedEl) usedEl.textContent = fmtCZK0.format(used);
+      if (barEl)  barEl.style.width = (100*used/48000).toFixed(1)+'%';
+
+      // Tabulka
+      els.perTable.innerHTML = '';
+      perResults.forEach(p=>{
+        const tr=document.createElement('tr');
+        tr.innerHTML = `
+          <td>${p.name}</td>
+          <td>${fmtCZK0.format(p.lump)}</td>
+          <td>${fmtCZK0.format(p.monthly)}</td>
+          <td>${fmtPct2.format(p.rate)}%</td>
+          <td>${fmtCZK0.format(p.fv)}</td>
+        `;
+        els.perTable.appendChild(tr);
+      });
+
+      // Poznámka
+      if (els.note) {
+        els.note.textContent = `Měsíční kapitalizace, průměrné roční zhodnocení po položkách, úložky na konci měsíce. Daňové úspory jsou informativní a do FV se nezahrnují.`;
+      }
+
+      // Graf – vykresli pouze, když je na očích
+      if (chartVisible) drawBarsAnnual(els.barChart, els.chartInner, annualTotal, annualDeposits);
+
+      // Ulož stav
+      saveState();
+    }
+
+    // Stepper – horizont (držení, šipky, PgUp/PgDn)
+    function clampYears(v){ return Math.max(1, Math.min(60, v|0)); }
+    function stepYears(dir){
+      els.years.value = clampYears(parseNum(els.years.value) + dir);
+      update();
+    }
+    enableSelectAll(els.years);
+    els.yearsMinus.addEventListener('click', ()=> stepYears(-1), {passive:true});
+    els.yearsPlus.addEventListener('click', ()=> stepYears(+1), {passive:true});
+    els.years.addEventListener('keydown', e=>{
+      if(e.key==='ArrowUp'){ e.preventDefault(); stepYears(+1); }
+      else if(e.key==='ArrowDown'){ e.preventDefault(); stepYears(-1); }
+      else if(e.key==='PageUp'){ e.preventDefault(); stepYears(+5); }
+      else if(e.key==='PageDown'){ e.preventDefault(); stepYears(-5); }
+    });
+    els.years.addEventListener('input', ()=> updateDebounced(), {passive:true});
+
+    // dlouhé podržení tlačítek stepperu
+    function holdButton(btn, dir){
+      let t; const start=()=>{ stepYears(dir); t=setInterval(()=>stepYears(dir), 120); };
+      const stop = ()=> clearInterval(t);
+      btn.addEventListener('mousedown', start);
+      btn.addEventListener('mouseup', stop);
+      btn.addEventListener('mouseleave', stop);
+      btn.addEventListener('touchstart', start, {passive:true});
+      btn.addEventListener('touchend', stop);
+    }
+    holdButton(els.yearsMinus, -1); holdButton(els.yearsPlus, +1);
+
+    // Form
+    els.form.addEventListener('submit', e=>{ e.preventDefault(); update(); }, {passive:false});
+    els.reset.addEventListener('click', ()=>{
+      els.years.value='20';
+      els.rows.innerHTML='';
+      portfolioCounter=0;
+      initDefaults();
+      update();
+    }, {passive:true});
+
+    // jediný listener na „Přidat produkt“
+    els.addRow.addEventListener('click', ()=> addRow({ kind:'PORT', fixedName: nextPortfolioName() }), {passive:true});
+
+    // IntersectionObserver – kresli graf jen když je vidět
+    const io = new IntersectionObserver(es=>{
+      es.forEach(e=>{
+        chartVisible = e.isIntersecting;
+        if (chartVisible && lastAnnualTotal.length) {
+          drawBarsAnnual(els.barChart, els.chartInner, lastAnnualTotal, lastAnnualDeposits);
+        }
+      });
+    },{threshold:.2});
+    io.observe(els.chartInner);
+
+    // Na startu: načti stav nebo dej defaulty
+    if(!loadState()) initDefaults();
+
+    // Po layoutu poprvé
+    setTimeout(update, 0);
+  </script>
+</body>
+</html>
+```
+
+Tento kód plně odděluje tři hlavní bloky stránky — vstupy, graf a výsledky — do samostatných sekcí, což zlepšuje přehlednost a uživatelskou orientaci na stránce. Všechny původní funkce a styl zůstávají zachovány.
