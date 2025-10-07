@@ -458,7 +458,7 @@
         wrap.innerHTML = `${nameCell}${inputMonthly}${inputEmployer}${inputLump}${inputRate}
           <div class="meta">
             <span class="tag dps-state">Státní příspěvek: – / měs.</span>
-            <span class="tag dps-tax">Roční daňová úspora (zobrazení): –</span>
+            <span class="tag dps-tax"></span>
             <span class="tag">Využití limitu 48 000: <b><span id="ded-used">–</span></b></span>
             <div class="progress" style="flex:1;min-width:140px"><i id="ded-bar" style="width:0%"></i></div>
           </div>`;
@@ -466,7 +466,7 @@
       } else if(kind==='DIP'){
         wrap.innerHTML = `${nameCell}${inputMonthly}${inputLump}${inputRate}
           <div class="meta">
-            <span class="tag dip-tax">Roční daňová úspora (zobrazení): –</span>
+            <span class="tag dip-tax"></span>
           </div>`;
       } else {
         wrap.innerHTML = `${nameCell}${inputMonthly}${inputLump}${inputRate}
@@ -701,4 +701,5 @@
   </script>
 </body>
 </html>
+
 
