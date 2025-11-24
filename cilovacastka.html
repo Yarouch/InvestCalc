@@ -1,0 +1,756 @@
+<!doctype html>
+<html lang="cs">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Cílová částka – kalkulačka spoření</title>
+  <style>
+    :root {
+      --bg: linear-gradient(180deg, #080A0E 0, #0B0C10 40%, #0E1014 100%);
+      --panel: #12141a;
+      --muted: #9aa3b2;
+      --text: #e6e9ef;
+      --brand: #4f8cff;
+      --principal: #4f6dff;
+      --interest: #00cc66;
+      --grid: rgba(255,255,255,.08);
+      --radius: 14px;
+      --ring: 0 0 0 3px rgba(79,140,255,.25);
+      --chart-aspect: .58;
+      color-scheme: light dark;
+    }
+    @media (prefers-color-scheme: light) {
+      :root {
+        --bg: linear-gradient(180deg, #fff 0, #f6f8fb 60%, #eef3f9 100%);
+        --panel: #fff;
+        --muted: #667085;
+        --text: #0b0c10;
+        --brand: #375dfb;
+        --grid: rgba(0,0,0,.08);
+      }
+    }
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font: 16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+      color: var(--text);
+      background: var(--bg);
+      min-height: 100svh;
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+
+    .topnav {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(18,20,26,.8);
+      border-bottom: 1px solid rgba(255,255,255,.06);
+      padding-top: max(10px, env(safe-area-inset-top));
+      backdrop-filter: blur(6px);
+    }
+    .topnav .inner {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 10px 20px;
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .topnav a {
+      display: inline-block;
+      padding: 10px 12px;
+      border-radius: 12px;
+      text-decoration: none;
+      color: #fff;
+      border: 1px solid transparent;
+      font-weight: 600;
+      font-size: 14px;
+    }
+    .topnav a.active {
+      background: linear-gradient(135deg, var(--brand), #6aa8ff);
+      color: #fff;
+      box-shadow: 0 8px 20px rgba(79,140,255,.35);
+    }
+    @media (prefers-color-scheme: light) {
+      .topnav {
+        background: rgba(255,255,255,.75);
+        border-bottom: 1px solid rgba(0,0,0,.06);
+      }
+      .topnav a {
+        color: #0b0c10;
+      }
+    }
+
+    .wrap {
+      max-width: 1100px;
+      margin: min(6vh,48px) auto;
+      padding: 20px;
+      padding-left: max(20px, env(safe-area-inset-left));
+      padding-right: max(20px, env(safe-area-inset-right));
+    }
+
+    header h1 {
+      margin: 0 0 6px;
+      font-size: clamp(26px, 3.2vw, 32px);
+    }
+    .lead {
+      margin: 0;
+      color: var(--muted);
+      max-width: 620px;
+      font-size: 15px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 400px 1fr;
+      gap: 22px;
+      align-items: flex-start;
+      margin-top: 24px;
+    }
+    @media (max-width: 900px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .card {
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: var(--radius);
+      background: linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,0));
+      box-shadow: 0 10px 30px rgba(0,0,0,.35);
+      backdrop-filter: blur(10px);
+    }
+    @media (prefers-color-scheme: light) {
+      .card {
+        background: var(--panel);
+        border-color: rgba(0,0,0,.04);
+        box-shadow: 0 14px 35px rgba(15,23,42,.12);
+      }
+    }
+    .card .head {
+      padding: 16px 16px 8px;
+      border-bottom: 1px solid rgba(255,255,255,.06);
+    }
+    @media (prefers-color-scheme: light) {
+      .card .head {
+        border-bottom-color: rgba(0,0,0,.06);
+      }
+    }
+    .card .body {
+      padding: 16px;
+    }
+
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      margin-bottom: 12px;
+      font-size: 14px;
+    }
+    .field label {
+      font-weight: 600;
+    }
+    .field small {
+      color: var(--muted);
+      font-weight: 400;
+    }
+
+    .input {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,.10);
+      background: rgba(0,0,0,.12);
+    }
+    .input:focus-within {
+      box-shadow: var(--ring);
+      border-color: rgba(79,140,255,.3);
+    }
+    @media (prefers-color-scheme: light) {
+      .input {
+        background: rgba(255,255,255,.9);
+        border-color: rgba(0,0,0,.08);
+      }
+    }
+
+    .input span {
+      color: var(--muted);
+      font-size: 14px;
+      white-space: nowrap;
+    }
+
+    input {
+      appearance: none;
+      border: 0;
+      outline: 0;
+      background: transparent;
+      width: 100%;
+      color: var(--text);
+      font: inherit;
+    }
+    input::placeholder {
+      color: rgba(255,255,255,.65);
+    }
+    @media (prefers-color-scheme: light) {
+      input::placeholder {
+        color: rgba(0,0,0,.55);
+      }
+    }
+
+    .btns {
+      display: flex;
+      gap: 8px;
+      margin-top: 8px;
+    }
+    .btn {
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,.12);
+      background: rgba(255,255,255,.06);
+      color: var(--text);
+      font-weight: 700;
+      padding: 10px 14px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    .btn.primary {
+      background: linear-gradient(135deg, var(--brand), #6aa8ff);
+      border-color: transparent;
+      color: #fff;
+      box-shadow: 0 8px 20px rgba(79,140,255,.35);
+    }
+
+    .kpis {
+      display: grid;
+      grid-template-columns: repeat(3,1fr);
+      gap: 12px;
+      margin-top: 12px;
+    }
+    @media (max-width: 640px) {
+      .kpis {
+        grid-template-columns: 1fr;
+      }
+    }
+    .kpi {
+      padding: 12px;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,.08);
+      background: linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,0));
+    }
+    @media (prefers-color-scheme: light) {
+      .kpi {
+        background: #f9fafb;
+        border-color: rgba(15,23,42,.06);
+      }
+    }
+    .kpi .title {
+      color: var(--muted);
+      font-weight: 700;
+      text-transform: uppercase;
+      font-size: 11px;
+      letter-spacing: .08em;
+      margin-bottom: 4px;
+    }
+    .kpi .value {
+      font-weight: 900;
+      font-size: clamp(18px,3.5vw,26px);
+    }
+
+    .legend {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .legend .dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 3px;
+      margin-right: 4px;
+      display: inline-block;
+    }
+
+    .chart-inner {
+      position: relative;
+      aspect-ratio: 16 / var(--chart-aspect);
+      width: 100%;
+    }
+    .chart-inner canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+    .y-labels {
+      position: absolute;
+      inset: 0 0 0 0;
+      pointer-events: none;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .chart-tooltip {
+      position: absolute;
+      pointer-events: none;
+      padding: 6px 8px;
+      font-size: 12px;
+      border-radius: 8px;
+      background: rgba(0,0,0,.75);
+      color: #fff;
+      transform: translate(-50%,-110%);
+      white-space: nowrap;
+      z-index: 2;
+      display: none;
+    }
+
+    footer {
+      margin-top: 16px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+<nav class="topnav">
+  <div class="inner">
+    <a href="index.html" id="nav-uroceni">Složené úročení</a>
+    <a href="renta.html" id="nav-renta">Finanční nezávislost</a>
+    <a href="kouzlo.html" id="nav-kouzlo">Kouzlo úročení</a>
+    <a href="hypoinv.html" id="nav-hypo">Hypotéka vs. investice</a>
+    <a href="inflace.html" id="nav-inflace">Kalkulačka inflace</a>
+    <a href="#" class="active" id="nav-cilovka">Cílová částka</a>
+  </div>
+</nav>
+
+<div class="wrap">
+  <header>
+    <h1>Kalkulačka cílové částky</h1>
+    <p class="lead">
+      Zadej, kolik chceš mít naspořeno, za jak dlouho a s jakým průměrným zhodnocením.
+      Kalkulačka spočítá potřebnou pravidelnou měsíční úložku. Zohlednit může i to, co už máš naspořeno.
+    </p>
+  </header>
+
+  <div class="grid">
+    <section class="card" aria-labelledby="formHeading">
+      <div class="head">
+        <h2 id="formHeading">Vstupy</h2>
+      </div>
+      <div class="body">
+        <form id="targetForm" autocomplete="off">
+          <div class="field">
+            <label for="target">Cílová částka</label>
+            <small>Kolik chceš mít na konci spoření.</small>
+            <div class="input">
+              <span>Kč</span>
+              <input id="target" type="text" inputmode="decimal" enterkeyhint="done"
+                     placeholder="např. 1 000 000" value="1 000 000" spellcheck="false">
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="years">Doba spoření (roky)</label>
+            <small>Délka spoření v letech.</small>
+            <div class="input">
+              <span>let</span>
+              <input id="years" type="text" inputmode="numeric" enterkeyhint="done"
+                     placeholder="např. 20" value="20" spellcheck="false">
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="rate">Roční zhodnocení p.a.</label>
+            <small>Průměrné roční zhodnocení před poplatky a daněmi.</small>
+            <div class="input">
+              <span>% p.a.</span>
+              <input id="rate" type="text" inputmode="decimal" enterkeyhint="done"
+                     placeholder="např. 6,00" value="6,00" spellcheck="false">
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="saved">Již naspořeno (volitelné)</label>
+            <small>Kolik už máš k dispozici na začátku spoření.</small>
+            <div class="input">
+              <span>Kč</span>
+              <input id="saved" type="text" inputmode="decimal" enterkeyhint="done"
+                     placeholder="např. 100 000" value="0" spellcheck="false">
+            </div>
+          </div>
+
+          <div class="btns">
+            <button class="btn primary" type="submit">Přepočítat</button>
+            <button id="resetBtn" class="btn" type="button">Vyčistit</button>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="chartHeading">
+      <div class="head">
+        <h2 id="chartHeading">Vývoj hodnoty spoření</h2>
+        <div class="legend">
+          <span><span class="dot" style="background: var(--principal)"></span> vklady</span>
+          <span><span class="dot" style="background: var(--interest)"></span> zhodnocení</span>
+        </div>
+      </div>
+      <div class="body">
+        <div class="chart-inner" id="chartInner">
+          <canvas id="barChart"></canvas>
+          <div class="y-labels" id="yLabels"></div>
+        </div>
+
+        <div class="kpis" id="results" hidden aria-live="polite" aria-atomic="true">
+          <div class="kpi">
+            <div class="title">Nutná měsíční úložka</div>
+            <div class="value" id="monthlyReq">–</div>
+          </div>
+          <div class="kpi">
+            <div class="title">Celkem vloženo</div>
+            <div class="value" id="deposits">–</div>
+          </div>
+          <div class="kpi">
+            <div class="title">Zhodnocení</div>
+            <div class="value" id="interest">–</div>
+          </div>
+        </div>
+
+        <footer id="note">
+          Měsíční kapitalizace, průměrné roční zhodnocení <strong>6,00 % p.a.</strong>.
+          Vklady na konci měsíce, výpočet neuvažuje daně ani poplatky.
+        </footer>
+      </div>
+    </section>
+  </div>
+</div>
+
+<script>
+  // --- Formátování a pomocné funkce (převzato ve stylu z původní stránky) ---
+  const fmtCZK0 = new Intl.NumberFormat("cs-CZ", {
+    style: "currency",
+    currency: "CZK",
+    maximumFractionDigits: 0
+  });
+  const fmtCZK = new Intl.NumberFormat("cs-CZ", {
+    style: "currency",
+    currency: "CZK",
+    minimumFractionDigits: 2
+  });
+
+  function parseNum(v) {
+    if (typeof v !== "string") return Number(v || 0);
+    return Number(
+      v.replace(/\s/g, "")
+       .replace(/\./g, "")
+       .replace(",", ".") || 0
+    );
+  }
+
+  function formatInput(el, dec = 0) {
+    const raw = String(el.value ?? "").replace(/\s/g, "")
+      .replace(/\./g, "")
+      .replace(",", ".");
+    let n = Number(raw || 0);
+    if (!Number.isFinite(n)) n = 0;
+    el.value = n.toLocaleString("cs-CZ", {
+      minimumFractionDigits: dec,
+      maximumFractionDigits: dec
+    });
+  }
+
+  function shortCZK(n) {
+    const a = Math.abs(n);
+    if (a >= 1e9) return (n/1e9).toFixed(2).replace(".", ",") + " mld.";
+    if (a >= 1e6) return (n/1e6).toFixed(2).replace(".", ",") + " mil.";
+    if (a >= 1e3) return (n/1e3).toFixed(1).replace(".", ",") + " tis.";
+    return fmtCZK0.format(n);
+  }
+
+  // --- Výpočet požadované měsíční úložky pro cílovou částku ---
+  function computeSchedule(target, P0, rAnnualPct, years) {
+    const months = Math.max(0, Math.round(Number(years || 0) * 12));
+    const r = Number(rAnnualPct || 0) / 100 / 12;
+    let PMT;
+
+    // vzorec pro anuitu s počátečním vkladem
+    if (months <= 0) {
+      PMT = 0;
+    } else if (Math.abs(r) < 1e-9) {
+      PMT = (target - P0) / months;
+    } else {
+      const growth = Math.pow(1 + r, months);
+      const numer = target - P0 * growth;
+      const denom = (growth - 1) / r;
+      PMT = numer / denom;
+    }
+
+    if (!Number.isFinite(PMT) || PMT < 0) PMT = 0;
+
+    // dopočet průběhu pro graf
+    let bal = P0;
+    let contributed = P0;
+    const annualTotal = [];
+    const annualDeposits = [];
+
+    for (let m = 1; m <= months; m++) {
+      bal = bal * (1 + r) + PMT;
+      contributed += PMT;
+      if (m % 12 === 0 || m === months) {
+        annualTotal.push(bal);
+        annualDeposits.push(contributed);
+      }
+    }
+
+    return { PMT, fv: bal, annualTotal, annualDeposits, months, deposited: contributed };
+  }
+
+  // --- Kreslení sloupcového grafu (stejný styl jako původní stránka) ---
+  function cssVar(name, fallback) {
+    const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+    return v || fallback;
+  }
+
+  function drawBarsAnnual(canvas, container, annualTotal, annualDeposits) {
+    const ctx = canvas.getContext("2d");
+    const dpr = window.devicePixelRatio || 1;
+    const pad = 28;
+
+    const W = container.clientWidth || 600;
+    const H = Math.max(220, Math.round(W * 0.6));
+    canvas.width = W * dpr;
+    canvas.height = H * dpr;
+    canvas.style.width = W + "px";
+    canvas.style.height = H + "px";
+
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    ctx.clearRect(0,0,W,H);
+
+    const n = annualTotal.length;
+    if (!n) return;
+
+    const maxVal = Math.max(...annualTotal, 1);
+    const left = pad * 2;
+    const right = pad;
+    const top = pad;
+    const bottom = pad * 2.2;
+    const chartW = W - left - right;
+    const chartH = H - top - bottom;
+
+    // mřížka
+    ctx.strokeStyle = cssVar("--grid", "rgba(255,255,255,.08)");
+    ctx.lineWidth = 1;
+    const lines = 6;
+    for (let i = 0; i <= lines; i++) {
+      const y = top + (chartH / lines) * i;
+      ctx.beginPath();
+      ctx.moveTo(left, y);
+      ctx.lineTo(left + chartW, y);
+      ctx.stroke();
+    }
+
+    const gap = Math.max(4, chartW / Math.max(n * 6, 1));
+    const barW = Math.max(8, (chartW - gap * (n + 1)) / n);
+    const zeroY = top + chartH;
+    const colP = cssVar("--principal", "#4f6dff");
+    const colI = cssVar("--interest", "#00cc66");
+    const rects = [];
+
+    for (let i = 0; i < n; i++) {
+      const total = annualTotal[i];
+      const depo = annualDeposits[i];
+      const hTotal = total / maxVal * chartH;
+      const hDepo = depo / maxVal * chartH;
+      const x = left + gap + i * (barW + gap);
+
+      ctx.fillStyle = colP;
+      ctx.fillRect(x, zeroY - hDepo, barW, hDepo);
+      ctx.fillStyle = colI;
+      ctx.fillRect(x, zeroY - hTotal, barW, hTotal - hDepo);
+
+      rects.push({ x, y: zeroY - hTotal, w: barW, h: hTotal, i });
+    }
+
+    // Y osy popisky
+    const yLabels = document.getElementById("yLabels");
+    if (yLabels) {
+      const labels = Array.from({length: lines + 1}, (_, i) => {
+        const val = Math.round((maxVal * (lines - i)) / lines);
+        const topPos = top + (chartH / lines) * i - 8;
+        return `<div style="position:absolute;left:4px;top:${topPos}px">${shortCZK(val)}</div>`;
+      });
+      yLabels.innerHTML = labels.join("");
+    }
+
+    // tooltip
+    let tt = container.querySelector(".chart-tooltip");
+    if (!tt) {
+      tt = document.createElement("div");
+      tt.className = "chart-tooltip";
+      container.appendChild(tt);
+    }
+
+    const onMove = (ev) => {
+      const bb = canvas.getBoundingClientRect();
+      const x = (ev.clientX ?? ev.touches?.[0]?.clientX) - bb.left;
+      const y = (ev.clientY ?? ev.touches?.[0]?.clientY) - bb.top;
+      let hit = null;
+      for (const r of rects) {
+        if (x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h) {
+          hit = r;
+          break;
+        }
+      }
+      if (!hit) {
+        tt.style.display = "none";
+        return;
+      }
+      const i = hit.i;
+      const year = i + 1;
+      const total = annualTotal[i];
+      const depo = annualDeposits[i];
+      const intr = total - depo;
+      tt.innerHTML =
+        `Rok ${year}<br>` +
+        `Vklady: <b>${shortCZK(depo)}</b><br>` +
+        `Zhodnocení: <b>${shortCZK(intr)}</b><br>` +
+        `Hodnota: <b>${shortCZK(total)}</b>`;
+      tt.style.left = (hit.x + hit.w / 2) + "px";
+      tt.style.top = hit.y + "px";
+      tt.style.display = "block";
+    };
+
+    container.onpointermove = onMove;
+    container.onpointerleave = () => { tt.style.display = "none"; };
+  }
+
+  // --- Napojení na DOM ---
+  const els = {
+    target: document.getElementById("target"),
+    years: document.getElementById("years"),
+    rate: document.getElementById("rate"),
+    saved: document.getElementById("saved"),
+    results: document.getElementById("results"),
+    monthlyReq: document.getElementById("monthlyReq"),
+    deposits: document.getElementById("deposits"),
+    interest: document.getElementById("interest"),
+    note: document.getElementById("note"),
+    chartInner: document.getElementById("chartInner"),
+    barChart: document.getElementById("barChart"),
+    yLabels: document.getElementById("yLabels"),
+    reset: document.getElementById("resetBtn"),
+    form: document.getElementById("targetForm")
+  };
+
+  function enableSelectAll(el) {
+    el.addEventListener("focus", () => {
+      el.select();
+      el.dataset.selAll = "1";
+    });
+    el.addEventListener("mouseup", (e) => {
+      if (el.dataset.selAll) {
+        e.preventDefault();
+        delete el.dataset.selAll;
+      }
+    });
+  }
+  [els.target, els.years, els.rate, els.saved].forEach(enableSelectAll);
+
+  function getRate() {
+    return parseNum(els.rate.value);
+  }
+  function setRate(v) {
+    const n = Number.isFinite(v) ? v : 0;
+    els.rate.value = n.toFixed(2).replace(".", ",");
+  }
+  function stepRate(delta) {
+    const next = Math.max(-100, Math.min(100, getRate() + delta));
+    setRate(next);
+    update({ formatRate: false });
+  }
+
+  function update(opts = { formatRate: true }) {
+    try {
+      formatInput(els.target, 0);
+      formatInput(els.years, 0);
+      formatInput(els.saved, 0);
+      if (opts.formatRate !== false) formatInput(els.rate, 2);
+    } catch (_) {}
+
+    const target = parseNum(els.target.value);
+    const years = parseNum(els.years.value);
+    const rate = parseNum(els.rate.value);
+    const saved = parseNum(els.saved.value);
+
+    const { PMT, fv, annualTotal, annualDeposits, months, deposited } =
+      computeSchedule(target, saved, rate, years);
+
+    const intr = fv - deposited;
+    els.monthlyReq.textContent = fmtCZK0.format(Math.max(0, PMT));
+    els.deposits.textContent = fmtCZK0.format(Math.max(0, deposited));
+    els.interest.textContent = fmtCZK0.format(Math.max(0, intr));
+    els.results.hidden = false;
+
+    els.note.innerHTML =
+      `Měsíční kapitalizace, průměrné roční zhodnocení ` +
+      `<strong>${rate.toFixed(2)} % p.a.</strong>. ` +
+      `Vklady na konci měsíce, výpočet neuvažuje daně ani poplatky.`;
+
+    drawBarsAnnual(els.barChart, els.chartInner, annualTotal, annualDeposits);
+  }
+
+  // odeslání formuláře
+  els.form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    update();
+  });
+
+  // live přepočet
+  ["input", "change"].forEach((evt) => {
+    [els.target, els.years, els.saved].forEach((el) => {
+      el.addEventListener(evt, () => update(), { passive: true });
+    });
+  });
+
+  // sazba – speciální chování
+  enableSelectAll(els.rate);
+  els.rate.addEventListener("input", () => update({ formatRate: false }));
+  els.rate.addEventListener("blur", () => update({ formatRate: true }));
+  els.rate.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowUp") {
+      e.preventDefault();
+      stepRate(e.shiftKey ? 1 : 0.25);
+    }
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      stepRate(e.shiftKey ? -1 : -0.25);
+    }
+  });
+  els.rate.addEventListener("wheel", (e) => {
+    if (document.activeElement === els.rate) {
+      e.preventDefault();
+      stepRate(e.deltaY < 0 ? (e.shiftKey ? 1 : 0.25) : (e.shiftKey ? -1 : -0.25));
+    }
+  }, { passive: false });
+
+  // reset
+  els.reset.addEventListener("click", () => {
+    els.target.value = "1 000 000";
+    els.years.value = "20";
+    els.rate.value = "6,00";
+    els.saved.value = "0";
+    update();
+  });
+
+  // první vykreslení
+  window.addEventListener("load", () => update(), { once: true });
+  window.addEventListener("resize", () => update(), { passive: true });
+  new ResizeObserver(() => update()).observe(els.chartInner);
+</script>
+</body>
+</html>
